@@ -37,9 +37,9 @@ namespace Tutorials.ResearchMode
             pointCloudMaterial.SetFloat("_PointSize", pointSize * transform.localScale.x);
         }
 
-        public void Render(Vector3[] arrVertices, Color pointColor)
+        public void Render(Vector3[] arrVertices, Color[] pointColors)
         {
-            Debug.Log("rendering points!");
+            Debug.Log(string.Format("rendering {0} points, first of which is of color {1}!", arrVertices.Length, pointColors[0]));
             int nPoints, nChunks;
             if (arrVertices == null)
             {
@@ -63,7 +63,7 @@ namespace Tutorials.ResearchMode
                 int nPointsToRender = System.Math.Min(maxChunkSize, nPoints - offset);
 
                 ElemRenderer renderer = elems[i].GetComponent<ElemRenderer>();
-                renderer.UpdateMesh(arrVertices, nPointsToRender, offset, pointColor);
+                renderer.UpdateMesh(arrVertices, nPointsToRender, offset, pointColors);
 
                 offset += nPointsToRender;
             }

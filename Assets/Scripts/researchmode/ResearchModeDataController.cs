@@ -8,6 +8,7 @@ using Tutorials.ResearchMode;
 using TMPro;
 using Tutorials;
 using Microsoft.MixedReality.Toolkit.UI.BoundsControl;
+using UnityEngine.Android;
 
 
 #if ENABLE_WINMD_SUPPORT
@@ -43,6 +44,7 @@ namespace Tutorials.ResearchMode
         public Color pointColor = Color.white;
         private PointCloudRenderer pointCloudRenderer;
         bool _renderPointCloud = false;
+        bool _renderLoadedPointCloud = false;
 
         public TextMeshPro text;
 
@@ -55,6 +57,8 @@ namespace Tutorials.ResearchMode
 
         public ObjectManager objectManager;
         bool shouldUpdate = true;
+        private Vector3[] loadedPoints;
+        private Color[] loadedPointColors;
         
 
 #if ENABLE_WINMD_SUPPORT
@@ -128,8 +132,12 @@ namespace Tutorials.ResearchMode
         
         private void UpdatePointCloud()
         {
+            if (_renderLoadedPointCloud) 
+            {
+                pointCloudRenderer.Render(loadedPoints, loadedPointColors);
+            }
  #if ENABLE_WINMD_SUPPORT
-            if (enablePointCloud && _renderPointCloud)
+            else if (enablePointCloud && _renderPointCloud)
             {
                 if ((depthSensorMode == DepthSensorMode.LongThrow && !researchMode.LongThrowPointCloudUpdated()) ||
                     (depthSensorMode == DepthSensorMode.ShortThrow && !researchMode.PointCloudUpdated()))
@@ -176,13 +184,29 @@ namespace Tutorials.ResearchMode
         {
             if (shouldUpdate)
             {
-                pointCloudRenderer.Render(data, pointColor);
+                Color[] pointColors = new Color[data.Length];
+                for (int i = 0; i < pointColors.Length; i++) pointColors[i] = pointColor;
+                pointCloudRenderer.Render(data, pointColors);
             }
         }
 
         public void TogglePointCloudRendering() {
             _renderPointCloud = !_renderPointCloud;
             pointCloudRendererGo.SetActive(_renderPointCloud);
+        }
+
+        public void ToggleLoadedPointCloud()
+        {
+            if (loadedPoints == null)
+            {
+                Debug.Log("Start loading PC");
+                FileHandler.LoadPointsFromPLY("Assets/PointClouds/converted_and_segmented.ply",
+                    out loadedPoints, out loadedPointColors);
+                Debug.Log(String.Format("Loaded {0} points, first is {1} with color {2}",
+                    loadedPoints.Length, loadedPoints[0], loadedPointColors[0]));
+            }
+            _renderLoadedPointCloud = !_renderLoadedPointCloud;
+            pointCloudRendererGo.SetActive(_renderLoadedPointCloud);
         }
 
         public void ToggleBoundingBox()
@@ -268,7 +292,7 @@ namespace Tutorials.ResearchMode
             try
             {
                 calc.GenerateHull(pointCloudPoints, false, ref verts, ref tris, ref normals);
-            } catch (Exception e)
+            } catch (Exception)
             {
                 Debug.Log("Error capturing points to use for the mesh. Are you capturing more than 4 co-planar points?");
                 return;

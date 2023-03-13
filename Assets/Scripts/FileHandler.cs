@@ -6,6 +6,9 @@ using System;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
 using UnityEngine.Events;
+using System.Runtime.Remoting.Messaging;
+using Microsoft.MixedReality.Toolkit.Utilities;
+using System.CodeDom;
 #if WINDOWS_UWP
 using Windows.Security.ExchangeActiveSyncProvisioning;
 #endif
@@ -239,6 +242,111 @@ namespace Tutorials
             AnimationListInstance.CopyArrayToLinkedList();
 
             AnimationListInstance.CurrentAnimationChanged.Invoke();
+        }
+
+        /// <summary>
+        /// TODO
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static void LoadPointsFromPLY(string path, out Vector3[] points, out Color[] colors)
+        {
+            points = null;
+            colors = null;
+            // After this prefix, the number of vertices is specified
+            const string length_prefix = "element vertex ";
+            int idx = length_prefix.Length;
+            // Points to the current position in the points and colors arrays that are being filled
+            int curr = 0;
+            try
+            {
+                // Is true iff the line containing 'end_header' has been consumed
+                bool read_header = false;
+                foreach(string line in System.IO.File.ReadLines(path))
+                {
+                    // Actually read points into the vector
+                    if (read_header)
+                    {
+                        // There are more vertices in the file than specified in the header
+                        if(curr >= points.Length)
+                        {
+                            Debug.Log("Unable to read all points in the cloud, actual number of vertices " +
+                                "does not match number of vertices given in header");
+                            return;
+                        }
+                        try
+                        {
+                            (Vector3? coordinates, Color color) = ParseLine(line.Trim());
+                            if (coordinates == null)
+                            {
+                                Debug.Log("Skipped malformed line");
+                                continue;
+                            }
+                            points[curr] = (Vector3) coordinates;
+                            colors[curr++] = color;
+                        }
+                        catch (FormatException)
+                        {
+                            Debug.Log("All point coordinates must be floats!");
+                        }
+                    }
+                    else
+                    {
+                        // Header ended
+                        if (line.Trim().Equals("end_header"))
+                        {
+                            Debug.Log("Read header");
+                            read_header = true;
+                            continue;
+                        }
+                        // Line contains number of vertices
+                        if (line.Length > idx && line.Substring(0, idx).Equals(length_prefix))
+                        {
+                            try
+                            {
+                                int n = Int32.Parse(line.Trim().Substring(idx));
+                                points = new Vector3[n];
+                                colors = new Color[n];
+                            }
+                            catch (FormatException)
+                            {
+                                Debug.Log("Number of vertices must be an integer");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (IOException ex) // Could not open file, probably does not exist or don't have permission
+            {
+                Debug.LogError(ex.Message);
+            }
+        }
+
+        private static (Vector3?, Color) ParseLine(string line)
+        {
+            Color default_color = Color.green;
+            string[] elements = line.Split(' ');
+            // Cannot parse malformed line
+            if (elements.Length < 3) return (null, default_color);
+            // x,y and z coordinates value of the point are the first three elements, seperated by space
+            // the next three space-seperated elements are the r,g and b value
+            float x = float.Parse(elements[0]);
+            float y = float.Parse(elements[1]);
+            float z = float.Parse(elements[2]);
+
+            Color color = default_color;
+            // use default color if RGB was not specified
+            if (elements.Length >= 6)
+            {
+                float r = float.Parse(elements[3]) / 255f;
+                float g = float.Parse(elements[4]) / 255f;
+                float b = float.Parse(elements[5]) / 255f; 
+                color = new Color(r, g, b);
+            }
+
+
+
+            return (new Vector3(x, y, z), color);
         }
 
 

@@ -12,6 +12,36 @@ namespace Tutorials.ResearchMode
     {
         public Mesh mesh;
         
+        public void UpdateMesh(Vector3[] arrVertices, int nPointsToRender, int nPointsRendered, Color[] pointColors)
+        {
+            int nPoints;
+
+            if (arrVertices == null)
+                nPoints = 0;
+            else
+                nPoints = System.Math.Min(nPointsToRender, arrVertices.Length - nPointsRendered);
+            nPoints = System.Math.Min(nPoints, 65535);
+
+            Vector3[] points = arrVertices.Skip(nPointsRendered).Take(nPoints).ToArray();
+            int[] indices = new int[nPoints];
+            Color[] colors = pointColors.Skip(nPointsRendered).Take(nPoints).ToArray();
+
+            for (int i = 0; i < nPoints; i++)
+            {
+                indices[i] = i;
+            }
+
+            if (mesh != null)
+                Destroy(mesh);
+            mesh = new Mesh();
+            mesh.vertices = points;
+            mesh.colors = colors;
+            mesh.SetIndices(indices, MeshTopology.Points, 0);
+            GetComponent<MeshFilter>().mesh = mesh;
+        }
+        // Old version, monochrome
+        /*
+         * 
         public void UpdateMesh(Vector3[] arrVertices, int nPointsToRender, int nPointsRendered, Color pointColor)
         {
             int nPoints;
@@ -40,5 +70,6 @@ namespace Tutorials.ResearchMode
             mesh.SetIndices(indices, MeshTopology.Points, 0);
             GetComponent<MeshFilter>().mesh = mesh;
         }
+        */
     }
 }
