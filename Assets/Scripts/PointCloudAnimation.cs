@@ -19,6 +19,9 @@ public class PointCloudAnimation : MonoBehaviour
     public GameObject pointCloudRendererGo;
     private PointCloudRenderer pointCloudRenderer;
 
+    public GameObject logger;
+    private DebugOutput dbg;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -27,13 +30,18 @@ public class PointCloudAnimation : MonoBehaviour
             pointCloudRenderer = pointCloudRendererGo.GetComponent<PointCloudRenderer>();
             pointCloudRendererGo.SetActive(playing);
         }
+
+        if(dbg == null)
+        {
+            dbg = logger.GetComponent<DebugOutput>();
+        }
     }
 
     // Update is called once per frame
     void Update()
     {
         if (!playing) return;
-        if (coordinates == null) LoadAnimation("Assets/PointClouds/CoffeBox");
+        if (coordinates == null) LoadAnimation("Assets/PointClouds/CoffeBox_downsampled");
 
         pointCloudRenderer.Render(coordinates[current_idx], colors[current_idx]);
         // Increment frame and wrap around if end is reached
@@ -45,10 +53,9 @@ public class PointCloudAnimation : MonoBehaviour
 
     private void LoadAnimation(string directory)
     {
-        Debug.Log("Started loading animation");
         string[] filenames = Directory.GetFiles(directory, "*.ply");
-        // TODO: remove
-        int n = 20;//filenames.Length;
+        int n = 10;//filenames.Length;
+        dbg.Log(string.Format("Loading {0} ply files", n));
 
         // Initialize enough space for all the point clouds
         coordinates = new Vector3[n][];
@@ -61,10 +68,9 @@ public class PointCloudAnimation : MonoBehaviour
         for (int i = 0; i < n; i++)
         {
             FileHandler.LoadPointsFromPLY(filenames[i], out coordinates[i], out colors[i]);
-            Debug.Log(string.Format("{0}% loaded", 100 * (double) (i+1) / n));
         }
 
-        Debug.Log("Animation loaded");
+        dbg.Log("Animation loaded");
 
     }
 
