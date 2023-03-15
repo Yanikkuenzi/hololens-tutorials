@@ -79,8 +79,8 @@ namespace Tutorials.ResearchMode
         {
             if (pointCloudRendererGo != null)
             {
-                pointCloudRenderer = pointCloudRendererGo.GetComponent<PointCloudRenderer>();
-                pointCloudRendererGo.SetActive(_renderPointCloud);
+                //pointCloudRenderer = pointCloudRendererGo.GetComponent<PointCloudRenderer>();
+                //pointCloudRendererGo.SetActive(_renderPointCloud);
             }
 
             _remoteConnection = GetComponent<RemoteConnection>();

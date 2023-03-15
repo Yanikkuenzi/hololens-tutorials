@@ -13,7 +13,7 @@ public class PointCloudAnimation : MonoBehaviour
     private Color[][] colors;
     private int current_idx = 0;
 
-    public bool repeat = true;
+    public bool repeat = false;
     public bool playing = false;
 
     public GameObject pointCloudRendererGo;
@@ -35,14 +35,20 @@ public class PointCloudAnimation : MonoBehaviour
         if (!playing) return;
         if (coordinates == null) LoadAnimation("Assets/PointClouds/CoffeBox");
 
-        pointCloudRenderer.Render(coordinates[current_idx], colors[current_idx++]);
+        pointCloudRenderer.Render(coordinates[current_idx], colors[current_idx]);
+        // Increment frame and wrap around if end is reached
+        current_idx = (current_idx + 1) % coordinates.Length;
+        // If last frame was played and repeat is not set, set playing to false
+        playing = current_idx > 0 || repeat;
 
     }
 
     private void LoadAnimation(string directory)
     {
+        Debug.Log("Started loading animation");
         string[] filenames = Directory.GetFiles(directory, "*.ply");
-        int n = filenames.Length;
+        // TODO: remove
+        int n = 20;//filenames.Length;
 
         // Initialize enough space for all the point clouds
         coordinates = new Vector3[n][];
@@ -55,12 +61,17 @@ public class PointCloudAnimation : MonoBehaviour
         for (int i = 0; i < n; i++)
         {
             FileHandler.LoadPointsFromPLY(filenames[i], out coordinates[i], out colors[i]);
+            Debug.Log(string.Format("{0}% loaded", 100 * (double) (i+1) / n));
         }
+
+        Debug.Log("Animation loaded");
 
     }
 
     public void TogglePointCloud()
     {
+        Debug.Log("PC toggled");
         playing = !playing;
+        pointCloudRendererGo.SetActive(playing);
     }
 }

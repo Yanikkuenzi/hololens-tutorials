@@ -295,7 +295,6 @@ namespace Tutorials
                         // Header ended
                         if (line.Trim().Equals("end_header"))
                         {
-                            Debug.Log("Read header");
                             read_header = true;
                             continue;
                         }

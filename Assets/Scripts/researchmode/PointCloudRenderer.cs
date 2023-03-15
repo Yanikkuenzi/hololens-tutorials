@@ -39,7 +39,7 @@ namespace Tutorials.ResearchMode
 
         public void Render(Vector3[] arrVertices, Color[] pointColors)
         {
-            Debug.Log(string.Format("rendering {0} points, first of which is of color {1}!", arrVertices.Length, pointColors[0]));
+            //Debug.Log(string.Format("rendering {0} points, first of which is at {1}!", arrVertices.Length, arrVertices[0]));
             int nPoints, nChunks;
             if (arrVertices == null)
             {
