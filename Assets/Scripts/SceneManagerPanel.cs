@@ -8,9 +8,17 @@ public class SceneManagerPanel : MonoBehaviour
     [SerializeField]
     private GameObject panel;
 
+    // Todo: remove
+    public GameObject logger;
+    public DebugOutput dbg;
+
     private void Start()
     {
         panel.SetActive(false);
+        if(dbg == null)
+        {
+            dbg = logger.GetComponent<DebugOutput>();
+        }
     }
 
     /// <summary>
@@ -19,5 +27,6 @@ public class SceneManagerPanel : MonoBehaviour
     public void ToggleSceneManager()
     {
         panel.SetActive(!panel.activeSelf);
+        dbg.Log("Toggled scene manager");
     }
 }

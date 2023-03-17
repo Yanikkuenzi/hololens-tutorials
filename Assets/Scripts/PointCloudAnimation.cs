@@ -5,7 +5,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using Tutorials;
 using Tutorials.ResearchMode;
-using Unity.PlasticSCM.Editor.WebApi;
+#if WINDOWS_UWP
+using Windows.Storage;
+using System.Threading.Tasks;
+#endif
 
 public class PointCloudAnimation : MonoBehaviour
 {
@@ -41,7 +44,10 @@ public class PointCloudAnimation : MonoBehaviour
     void Update()
     {
         if (!playing) return;
-        if (coordinates == null) LoadAnimation("Assets/PointClouds/CoffeBox_downsampled");
+        if (coordinates == null)
+        {
+            LoadAnimation("CoffeBox_downsampled");
+        }
 
         pointCloudRenderer.Render(coordinates[current_idx], colors[current_idx]);
         // Increment frame and wrap around if end is reached
@@ -53,8 +59,26 @@ public class PointCloudAnimation : MonoBehaviour
 
     private void LoadAnimation(string directory)
     {
-        string[] filenames = Directory.GetFiles(directory, "*.ply");
-        int n = 10;//filenames.Length;
+        string[] filenames = null;
+        try
+        {
+#if WINDOWS_UWP
+            StorageFolder local = ApplicationData.Current.LocalFolder;
+            string dir = local.Path + "/PointClouds/" + directory;
+            filenames = Directory.GetFiles(dir, "*.ply");
+
+#else
+            filenames = Directory.GetFiles("Assets/Resources/PointClouds/" + directory, "*.ply");
+#endif
+        }
+        catch (Exception e)
+        {
+            dbg.Log(e.ToString());
+            playing = false;
+            return;
+        }
+
+        int n = Math.Min(filenames.Length, 10);
         dbg.Log(string.Format("Loading {0} ply files", n));
 
         // Initialize enough space for all the point clouds
