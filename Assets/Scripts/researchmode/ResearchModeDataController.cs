@@ -45,6 +45,7 @@ namespace Tutorials.ResearchMode
         private PointCloudRenderer pointCloudRenderer;
         bool _renderPointCloud = false;
         bool _renderLoadedPointCloud = false;
+        bool _capturePointCloud = false;
 
         public TextMeshPro text;
 
@@ -79,8 +80,8 @@ namespace Tutorials.ResearchMode
         {
             if (pointCloudRendererGo != null)
             {
-                //pointCloudRenderer = pointCloudRendererGo.GetComponent<PointCloudRenderer>();
-                //pointCloudRendererGo.SetActive(_renderPointCloud);
+                pointCloudRenderer = pointCloudRendererGo.GetComponent<PointCloudRenderer>();
+                pointCloudRendererGo.SetActive(_renderPointCloud);
             }
 
             _remoteConnection = GetComponent<RemoteConnection>();
@@ -94,7 +95,10 @@ namespace Tutorials.ResearchMode
         void LateUpdate()
         {
             SendPing();
-            UpdatePointCloud();
+            // if (_renderLoadedPointCloud ) 
+            //     UpdatePointCloud();
+            if (_capturePointCloud)
+                CapturePointCloud();
         }
 
         private void InitResearchMode()
@@ -129,6 +133,27 @@ namespace Tutorials.ResearchMode
             researchMode.StartSpatialCamerasFrontLoop();
 #endif
         }
+
+        private void CapturePointCloud()
+        {
+ #if ENABLE_WINMD_SUPPORT
+            // No new data to capture
+            if (!researchMode.PointCloudUpdated())
+                return;
+
+            float[] pointCloud = researchMode.GetPointCloudBuffer();
+            int nPoints = pointCloud.Length / 3;
+            if (nPoints > 0)
+            {
+                Vector3[] points = new Vector3[nPoints];
+                for (int i = 0; i < pointCloud.Length; i++)
+                {
+                    pointCloudVector3[i] =
+                        new Vector3(points[3 * i], points[3 * i + 1], points[3 * i + 2]);
+                }
+            }
+#endif
+        }
         
         private void UpdatePointCloud()
         {
@@ -136,7 +161,7 @@ namespace Tutorials.ResearchMode
             {
                 pointCloudRenderer.Render(loadedPoints, loadedPointColors);
             }
- #if ENABLE_WINMD_SUPPORT
+#if ENABLE_WINMD_SUPPORT
             else if (enablePointCloud && _renderPointCloud)
             {
                 if ((depthSensorMode == DepthSensorMode.LongThrow && !researchMode.LongThrowPointCloudUpdated()) ||

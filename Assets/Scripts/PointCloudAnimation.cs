@@ -63,8 +63,9 @@ public class PointCloudAnimation : MonoBehaviour
         try
         {
 #if WINDOWS_UWP
-            StorageFolder local = ApplicationData.Current.LocalFolder;
-            string dir = local.Path + "/PointClouds/" + directory;
+            StorageFolder o3d = KnownFolders.Objects3D;
+            string dir = o3d.Path + "/" + directory;
+            dbg.Log("Looking for ply files in: " + dir);
             filenames = Directory.GetFiles(dir, "*.ply");
 
 #else
@@ -78,7 +79,8 @@ public class PointCloudAnimation : MonoBehaviour
             return;
         }
 
-        int n = Math.Min(filenames.Length, 10);
+        int n = Math.Min(filenames.Length, 50);
+        //int n = filenames.Length;
         dbg.Log(string.Format("Loading {0} ply files", n));
 
         // Initialize enough space for all the point clouds
