@@ -37,6 +37,7 @@ public class PointCloudAnimation : MonoBehaviour
         if(dbg == null)
         {
             dbg = logger.GetComponent<DebugOutput>();
+            Debug.Log(string.Format("dbg in PCA: {0}", dbg));
         }
     }
 
