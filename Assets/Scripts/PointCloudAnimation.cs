@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Tutorials;
 using Tutorials.ResearchMode;
+using Microsoft.MixedReality.Toolkit.Diagnostics;
 #if WINDOWS_UWP
 using Windows.Storage;
 using System.Threading.Tasks;
@@ -47,7 +48,10 @@ public class PointCloudAnimation : MonoBehaviour
         if (!playing) return;
         if (coordinates == null)
         {
-            LoadAnimation("CoffeBox_downsampled");
+            //LoadAnimation("CoffeBox_downsampled");
+            LoadAnimation("29-03-2023T08_51");
+            // TODO: move this to export
+            FilterPoints(.5);
         }
 
         pointCloudRenderer.Render(coordinates[current_idx], colors[current_idx]);
@@ -80,8 +84,8 @@ public class PointCloudAnimation : MonoBehaviour
             return;
         }
 
-        int n = Math.Min(filenames.Length, 50);
-        //int n = filenames.Length;
+        //int n = Math.Min(filenames.Length, 50);
+        int n = filenames.Length;
         dbg.Log(string.Format("Loading {0} ply files", n));
 
         // Initialize enough space for all the point clouds
@@ -106,5 +110,27 @@ public class PointCloudAnimation : MonoBehaviour
         Debug.Log("PC toggled");
         playing = !playing;
         pointCloudRendererGo.SetActive(playing);
+    }
+
+    public void FilterPoints(double dist)
+    {
+        // Square distance to avoid having to take square roots in loop for norm
+        dist *= dist;
+        for (int i = 0; i < coordinates.Length; ++i) 
+        {
+            Vector3[] pointCloud = coordinates[i];
+            for (int j = 0; j < pointCloud.Length; ++j) 
+            {
+                if (pointCloud[j].sqrMagnitude > dist) 
+                {
+                    //pointCloud[j] = Vector3.zero;
+                    colors[i][j] = Color.red;
+                }
+                else
+                {
+                    colors[i][j] = Color.green;
+                }
+            }
+        }
     }
 }
