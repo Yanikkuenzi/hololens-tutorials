@@ -6,6 +6,8 @@ using UnityEngine;
 using Tutorials;
 using Tutorials.ResearchMode;
 using Microsoft.MixedReality.Toolkit.Diagnostics;
+using UnityEngine.XR.WSA.Input;
+using System.Diagnostics.PerformanceData;
 #if WINDOWS_UWP
 using Windows.Storage;
 using System.Threading.Tasks;
@@ -13,8 +15,8 @@ using System.Threading.Tasks;
 
 public class PointCloudAnimation : MonoBehaviour
 {
-    private Vector3[][] coordinates;
-    private Color[][] colors;
+    private PointCloudCollection clouds;
+
     private int current_idx = 0;
 
     public bool repeat = false;
@@ -38,7 +40,6 @@ public class PointCloudAnimation : MonoBehaviour
         if(dbg == null)
         {
             dbg = logger.GetComponent<DebugOutput>();
-            Debug.Log(string.Format("dbg in PCA: {0}", dbg));
         }
     }
 
@@ -46,91 +47,37 @@ public class PointCloudAnimation : MonoBehaviour
     void Update()
     {
         if (!playing) return;
-        if (coordinates == null)
+        if (clouds == null)
         {
-            //LoadAnimation("CoffeBox_downsampled");
-            LoadAnimation("29-03-2023T08_51");
-            // TODO: move this to export
-            FilterPoints(.5);
+            clouds = new PointCloudCollection();
+            //clouds.LoadFromPLY("30-03-2023T19_00");
+            clouds.LoadFromPLY("CoffeBox_downsampled");
+
+            Matrix4x4 M = new Matrix4x4(
+                    new Vector4(636.65930176f, 0, 0, 0),
+                    new Vector4(0, 636.25195312f, 0, 0),
+                    new Vector4(635.28388188f, 366.87403535f, 1, 0),
+                    new Vector4(0, 0, 0, 0));
+            
+            Texture2D tex = new Texture2D(1, 1);
+            tex.LoadImage(File.ReadAllBytes("Assets/Resources/000000.png"));
+            clouds.Get(0).ColorFromImage(tex, M);
         }
 
-        pointCloudRenderer.Render(coordinates[current_idx], colors[current_idx]);
+        PointCloud current = clouds.Get(current_idx);
+        pointCloudRenderer.Render(current.Points, current.Colors);
+
         // Increment frame and wrap around if end is reached
-        current_idx = (current_idx + 1) % coordinates.Length;
+        current_idx = (current_idx + 1) % clouds.Count;
         // If last frame was played and repeat is not set, set playing to false
         playing = current_idx > 0 || repeat;
-
     }
 
-    private void LoadAnimation(string directory)
-    {
-        string[] filenames = null;
-        try
-        {
-#if WINDOWS_UWP
-            StorageFolder o3d = KnownFolders.Objects3D;
-            string dir = o3d.Path + "/" + directory;
-            dbg.Log("Looking for ply files in: " + dir);
-            filenames = Directory.GetFiles(dir, "*.ply");
-
-#else
-            filenames = Directory.GetFiles("Assets/Resources/PointClouds/" + directory, "*.ply");
-#endif
-        }
-        catch (Exception e)
-        {
-            dbg.Log(e.ToString());
-            playing = false;
-            return;
-        }
-
-        //int n = Math.Min(filenames.Length, 50);
-        int n = filenames.Length;
-        dbg.Log(string.Format("Loading {0} ply files", n));
-
-        // Initialize enough space for all the point clouds
-        coordinates = new Vector3[n][];
-        colors = new Color[n][];
-
-        // Make sure we get the correct order
-        Array.Sort(filenames);
-
-        // Load all the point clouds belonging to the animation
-        for (int i = 0; i < n; i++)
-        {
-            FileHandler.LoadPointsFromPLY(filenames[i], out coordinates[i], out colors[i]);
-        }
-
-        dbg.Log("Animation loaded");
-
-    }
 
     public void TogglePointCloud()
     {
-        Debug.Log("PC toggled");
         playing = !playing;
         pointCloudRendererGo.SetActive(playing);
     }
 
-    public void FilterPoints(double dist)
-    {
-        // Square distance to avoid having to take square roots in loop for norm
-        dist *= dist;
-        for (int i = 0; i < coordinates.Length; ++i) 
-        {
-            Vector3[] pointCloud = coordinates[i];
-            for (int j = 0; j < pointCloud.Length; ++j) 
-            {
-                if (pointCloud[j].sqrMagnitude > dist) 
-                {
-                    //pointCloud[j] = Vector3.zero;
-                    colors[i][j] = Color.red;
-                }
-                else
-                {
-                    colors[i][j] = Color.green;
-                }
-            }
-        }
-    }
 }

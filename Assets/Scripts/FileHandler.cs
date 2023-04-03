@@ -249,13 +249,15 @@ namespace Tutorials
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public static void LoadPointsFromPLY(string path, out Vector3[] points, out Color[] colors)
+        public static void LoadPointsFromPLY(string path, out ArrayList points, out ArrayList colors)
         {
             points = null;
             colors = null;
+
             // After this prefix, the number of vertices is specified
             const string length_prefix = "element vertex ";
             int idx = length_prefix.Length;
+
             // Points to the current position in the points and colors arrays that are being filled
             int curr = 0;
             try
@@ -268,22 +270,21 @@ namespace Tutorials
                     if (read_header)
                     {
                         // There are more vertices in the file than specified in the header
-                        if(curr >= points.Length)
+                        if(curr >= points.Capacity)
                         {
-                            Debug.Log("Unable to read all points in the cloud, actual number of vertices " +
-                                "does not match number of vertices given in header");
-                            return;
+                            Debug.Log("There are more vertices than specified in the header");
                         }
                         try
                         {
                             (Vector3? coordinates, Color color) = ParseLine(line.Trim());
                             if (coordinates == null)
                             {
-                                Debug.Log("Skipped malformed line");
+                                Debug.Log("Skipped malformed line: " + line);
                                 continue;
                             }
-                            points[curr] = (Vector3) coordinates;
-                            colors[curr++] = color;
+                            points.Add(coordinates);
+                            colors.Add(color);
+                            curr++;
                         }
                         catch (FormatException)
                         {
@@ -304,8 +305,8 @@ namespace Tutorials
                             try
                             {
                                 int n = Int32.Parse(line.Trim().Substring(idx));
-                                points = new Vector3[n];
-                                colors = new Color[n];
+                                points = new ArrayList(n);
+                                colors = new ArrayList(n);
                             }
                             catch (FormatException)
                             {

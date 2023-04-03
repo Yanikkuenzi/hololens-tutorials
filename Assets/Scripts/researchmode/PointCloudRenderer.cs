@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
+using System.Collections;
 
 namespace Tutorials.ResearchMode
 {
@@ -18,7 +19,6 @@ namespace Tutorials.ResearchMode
 
         void Start()
         {
-            Debug.Log("Starting");
             elems = new List<GameObject>();
             UpdatePointSize();
         }
@@ -37,9 +37,8 @@ namespace Tutorials.ResearchMode
             pointCloudMaterial.SetFloat("_PointSize", pointSize * transform.localScale.x);
         }
 
-        public void Render(Vector3[] arrVertices, Color[] pointColors)
+        public void Render(ArrayList arrVertices, ArrayList pointColors)
         {
-            //Debug.Log(string.Format("rendering {0} points, first of which is at {1}!", arrVertices.Length, arrVertices[0]));
             int nPoints, nChunks;
             if (arrVertices == null)
             {
@@ -48,7 +47,7 @@ namespace Tutorials.ResearchMode
             }
             else
             {
-                nPoints = arrVertices.Length;
+                nPoints = arrVertices.Count;
                 nChunks = 1 + nPoints / maxChunkSize;
             }
 
@@ -68,6 +67,7 @@ namespace Tutorials.ResearchMode
                 offset += nPointsToRender;
             }
         }
+
 
         void AddElems(int nElems)
         {

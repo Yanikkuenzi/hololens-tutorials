@@ -159,7 +159,7 @@ namespace Tutorials.ResearchMode
         {
             if (_renderLoadedPointCloud) 
             {
-                pointCloudRenderer.Render(loadedPoints, loadedPointColors);
+                //pointCloudRenderer.Render(loadedPoints, loadedPointColors);
             }
 #if ENABLE_WINMD_SUPPORT
             else if (enablePointCloud && _renderPointCloud)
@@ -211,7 +211,7 @@ namespace Tutorials.ResearchMode
             {
                 Color[] pointColors = new Color[data.Length];
                 for (int i = 0; i < pointColors.Length; i++) pointColors[i] = pointColor;
-                pointCloudRenderer.Render(data, pointColors);
+                //pointCloudRenderer.Render(data, pointColors);
             }
         }
 
@@ -223,13 +223,13 @@ namespace Tutorials.ResearchMode
         public void ToggleLoadedPointCloud()
         {
             if (loadedPoints == null)
-            {
-                Debug.Log("Start loading PC");
-                FileHandler.LoadPointsFromPLY("Assets/PointClouds/converted_and_segmented.ply",
-                    out loadedPoints, out loadedPointColors);
-                Debug.Log(String.Format("Loaded {0} points, first is {1} with color {2}",
-                    loadedPoints.Length, loadedPoints[0], loadedPointColors[0]));
-            }
+            //{
+            //    Debug.Log("Start loading PC");
+            //    FileHandler.LoadPointsFromPLY("Assets/PointClouds/converted_and_segmented.ply",
+            //        out loadedPoints, out loadedPointColors);
+            //    Debug.Log(String.Format("Loaded {0} points, first is {1} with color {2}",
+            //        loadedPoints.Length, loadedPoints[0], loadedPointColors[0]));
+            //}
             _renderLoadedPointCloud = !_renderLoadedPointCloud;
             pointCloudRendererGo.SetActive(_renderLoadedPointCloud);
         }

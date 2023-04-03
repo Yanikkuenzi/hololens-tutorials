@@ -6,21 +6,24 @@ using UnityEngine.XR.ARSubsystems;
 using Microsoft.MixedReality.Toolkit.Input;
 using System.Runtime.InteropServices;
 using System;
+using UnityEngine.Windows.WebCam;
+using System.Linq;
 
 #if ENABLE_WINMD_SUPPORT
-using Windows.Storage;
 using HL2UnityPlugin;
 #endif
 
 public class AnimationRecorder : MonoBehaviour
 {
-    private ArrayList points;
-    private ArrayList colors;
-
     public GameObject logger;
     private DebugOutput dbg;
 
-    public double distance_threshold;
+    private PointCloudCollection current_animation;
+
+    private PhotoCapture photoCaptureObject = null;
+    private Texture2D targetTexture = null;
+    private CameraParameters cameraParameters;
+    private bool cameraReady = false;
 
     private bool recording;
 #if ENABLE_WINMD_SUPPORT
@@ -31,112 +34,130 @@ public class AnimationRecorder : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        if(dbg == null)
+        {
+            dbg = logger.GetComponent<DebugOutput>();
+        }
 
 #if ENABLE_WINMD_SUPPORT
         IntPtr WorldOriginPtr = UnityEngine.XR.WindowsMR.WindowsMREnvironment.OriginSpatialCoordinateSystem;
         unityWorldOrigin = Marshal.GetObjectForIUnknown(WorldOriginPtr) as Windows.Perception.Spatial.SpatialCoordinateSystem;
 #endif
-        points = new ArrayList();
-        colors = new ArrayList();
-        recording = false;
+        // Set up everything for capturing images, giving color to point cloud
+        // See: https://docs.unity3d.com/2019.4/Documentation/ScriptReference/Windows.WebCam.PhotoCapture.html
 
-        // Square distance threshold for efficiency later
-        distance_threshold *= distance_threshold;
+        current_animation = new PointCloudCollection(); 
+
+        recording = false;
 
         InitResearchMode();
 
-        if(dbg == null)
+        // Camera setup
+        try
         {
-            dbg = logger.GetComponent<DebugOutput>();
-            Debug.Log(string.Format("dbg in AR: {0}", dbg));
+            PhotoCapture.CreateAsync(false, OnPhotoCaptureCreated);
+        } catch (Exception e)
+        {
+            Debug.Log("Caught exception: " + e.ToString());
         }
+
+
+    }
+
+    private void OnPhotoCaptureCreated(PhotoCapture captureObject)
+    {
+        dbg.Log("Starting to initialize camera");
+
+        this.photoCaptureObject = captureObject;
+        Resolution res = PhotoCapture.SupportedResolutions.OrderByDescending(resolution => resolution.width * resolution.height).First();
+        CameraParameters cameraParams = new CameraParameters(WebCamMode.PhotoMode);
+        cameraParameters.hologramOpacity = 0f;
+        cameraParameters.cameraResolutionWidth = res.width;
+        cameraParameters.cameraResolutionHeight = res.height;
+        cameraParameters.pixelFormat = CapturePixelFormat.BGRA32;
+        this.targetTexture = new Texture2D(res.width, res.height);
+
+        photoCaptureObject.StartPhotoModeAsync(cameraParameters, OnPhotoModeStarted);
+        dbg.Log("Camera initialization successfull");
+    }
+
+    private void OnPhotoModeStarted(PhotoCapture.PhotoCaptureResult res)
+    {
+        this.cameraReady = res.success;
+    }
+
+    private void TakePhoto()
+    {
+        if (!cameraReady)
+        {
+            dbg.Log("Could not take photo becuase camera is not ready!");
+            return;
+        }
+
+        photoCaptureObject.TakePhotoAsync(OnCapturedPhotoToMemory);
+    }
+
+    private void OnCapturedPhotoToMemory(PhotoCapture.PhotoCaptureResult res, PhotoCaptureFrame captureFrame)
+    {
+        // Copy the raw image data into our target texture
+        captureFrame.UploadImageDataToTexture(targetTexture);
+
+        // Create a gameobject that we can apply our texture to
+        GameObject quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        Renderer quadRenderer = quad.GetComponent<Renderer>() as Renderer;
+        quadRenderer.material = new Material(Shader.Find("Unlit/Texture"));
+
+        quad.transform.parent = this.transform;
+        quad.transform.localPosition = new Vector3(0.0f, 0.0f, 3.0f);
+
+        quadRenderer.material.SetTexture("_MainTex", targetTexture);
+        dbg.Log("Captured image shown");
     }
 
     void LateUpdate()
     {
-#if ENABLE_WINMD_SUPPORT
         if (!recording) 
             return;
 
+#if ENABLE_WINMD_SUPPORT
         try
         {
+
+            if (researchMode == null)
+            {
+                dbg.Log("Research mode is null");
+            }
+
             if (!researchMode.PointCloudUpdated()) {
-                //dbg.Log("Point cloud not updated");
                 return;
             }
 
-            dbg.Log("Recording");
-
-            float[] pointCloud = researchMode.GetPointCloudBuffer();
-            dbg.Log(string.Format("{0} points in PointCloudBuffer", pointCloud.Length));
-            int nPoints = pointCloud.Length / 3;
-            if (nPoints > 0)
+            float[] points = researchMode.GetPointCloudBuffer();
+            if (points == null)
             {
-                int idx = points.Add(new Vector3[nPoints]);
-                colors.Add(new Color[nPoints]);
-                for (int i = 0; i < nPoints; i++)
-                {
-                    Vector3 coordinates = new Vector3(pointCloud[3 * i], pointCloud[3 * i + 1], pointCloud[3 * i + 2]);
-                    if (coordinates.sqrMagnitude > distance_threshold)
-                    {
-                        coordinates = Vector.zero;
-                    }
-                    ((Vector3[])points[idx])[i] = coordinates;
-                    // TODO: capture color
-                    ((Color[])colors[idx])[i] = Color.magenta;
-                }
+                dbg.Log("points is null");
             }
+
+            dbg.Log(string.Format("{0} points in PointCloudBuffer", points.Length));
+            PointCloud pointCloud = new PointCloud(points, .5);
+            if (pointCloud == null)
+            {
+                dbg.Log("pointCloud is null");
+            }
+            pointCloud.RandomDownSample(2000);
+            if (current_animation == null)
+            {
+                dbg.Log("current_animation is null");
+            }
+            current_animation.AddPointCloud(pointCloud);
         } catch(Exception e)
         {
             dbg.Log(e.ToString());
         }
-        dbg.Log(string.Format("Extended animation to {0} pointclouds", points.Count));
 #endif
-    }
 
-    void ExportToFiles(string directory)
-    {
-        dbg.Log("Export");
-#if ENABLE_WINMD_SUPPORT
-        StorageFolder objects_3d = KnownFolders.Objects3D;
-        // Prepend storage location and create output directory
-        directory = objects_3d.Path + "/" + directory;
-        Directory.CreateDirectory(directory);
-        dbg.Log(string.Format("Started exporting {0} point clouds to {1}", points.Count, directory));
-        for (int i = 0; i < points.Count; i++)
-        {
-            // Use the index of the pointcloud in the animation as its file name
-            using (StreamWriter writer = new StreamWriter(directory + "/" + string.Format("{0:D6}.ply", i)))
-            {
-                Vector3[] curr_points = (Vector3[])points[i];
-                Color[] curr_colors = (Color[])colors[i];
-                // Use same format as point clouds expoted using Open3d
-                string header = string.Format("ply\nformat ascii 1.0\nComment Generated by Floating Hands\n" +
-                    "element vertex {0}\n" +
-                    "property double x\nproperty double y\nproperty double z\n" +
-                    "property uchar red\nproperty uchar green\nproperty uchar blue\n" +
-                    "end_header\n", curr_points.Length);
-                
-                writer.WriteLine(header);
-                // Write each point and its corresponding color
-                for(int j = 0; j < curr_points.Length; j++)
-                {
-                    // Don't write points at origin
-                    if (curr_points[j] == Vector.zero) 
-                        continue;
-
-                    writer.WriteLine(string.Format("{0} {1} {2} {3} {4} {5}",
-                        curr_points[j].x, curr_points[j].y, curr_points[j].z,
-                        (int)(curr_colors[j].r * 255), (int)(curr_colors[j].g * 255), (int)(curr_colors[j].b * 255)));
-                }
-            }
-
-        }
-#endif
-        // Drop current animation as soon as its written to disk
-        this.points = new ArrayList();
-        this.colors = new ArrayList();
-
+        recording = false;
+        photoCaptureObject.TakePhotoAsync(OnCapturedPhotoToMemory);
     }
 
     public void ToggleRecording()
@@ -148,7 +169,12 @@ public class AnimationRecorder : MonoBehaviour
         {
             try
             {
-                ExportToFiles(DateTime.Now.ToString("dd-MM-yyyyTHH_mm"));
+                dbg.Log("Started export");
+                current_animation.ExportToPLY(DateTime.Now.ToString("dd-MM-yyyyTHH_mm"));
+                dbg.Log("Finished export");
+                // Allocate new PC collection for next animation, freeing memory
+                // for animation that was just written
+                current_animation = new PointCloudCollection();
             }
             catch (Exception e)
             {
@@ -170,5 +196,12 @@ public class AnimationRecorder : MonoBehaviour
         researchMode.StartSpatialCamerasFrontLoop();
 #endif
     }
-
+    void OnStoppedPhotoMode(PhotoCapture.PhotoCaptureResult result)
+    {
+        // Shutdown our photo capture resource
+        dbg.Log("Shutting down camera");
+        photoCaptureObject.Dispose();
+        photoCaptureObject = null;
+    }
 }
+
