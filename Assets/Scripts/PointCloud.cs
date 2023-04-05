@@ -133,18 +133,47 @@ public class PointCloud
 
     public void ColorFromImage(Texture2D texture, Matrix4x4 cameraMatrix)
     {
+        // Ignore previous color information
         colors.Clear();
+
+        // Debug
+        float min_u = float.PositiveInfinity;
+        float min_v = float.PositiveInfinity;
+        float max_u = float.NegativeInfinity;
+        float max_v = float.NegativeInfinity;
+
+        float u_offset = cameraMatrix[0, 2];
+        float v_offset = cameraMatrix[1, 2];
+
         foreach (Vector3 point in points)
         {
-            // Project to image plane
-            Vector3 projected = cameraMatrix.MultiplyPoint3x4(point);
+            // Convert 3d point in world coordinates to homogeneous point
+            Vector4 homogeneous_point = point;
+            homogeneous_point.w = 1;
+            // Project to image plane (https://en.wikipedia.org/wiki/Camera_resectioning)
+            // projected = z * [u, v, 1]^T = M * [x, y, z, 1]^T
+            Vector3 projected = cameraMatrix * homogeneous_point;
             // Convert to homogeneous coordinates, z coordinate must be 1
-            projected /= projected[2];
-            float u = projected[0];// + cameraMatrix[0, 2];
-            float v = projected[1];// + cameraMatrix[1, 2];
-            Debug.Log(string.Format("Getting pixel at ({0}, {1})", u, v));
+            projected /= projected.z;
+            // Translate between coordinate systems as (0,0) is in the bottom left corner of
+            // of the uv coordinate system used by Texture2D and not centered
+            float u = (projected.x + u_offset);
+            float v = (projected.y + v_offset);
+
+            // TODO: remove, only for debugging purposes
+            min_u = Math.Min(u, min_u);
+            min_v = Math.Min(v, min_v);
+            max_u = Math.Max(u, max_u);
+            max_v = Math.Max(v, max_v);
+            //Debug.Log(string.Format("Getting pixel at ({0}, {1})", u, v));
+
+            // Assign the current point the right color corresponding to its projection onto 
+            // the image plane
             colors.Add(texture.GetPixelBilinear(u, v));
         }
         Debug.Log(string.Format("Texture has dimensions: {0} x {1}", texture.width, texture.height));
+        Debug.Log(string.Format("Center is at ({0}, {1})", u_offset, v_offset));
+        Debug.Log(string.Format("(min_u, min_v) = ({0}, {1})", min_u, min_v));
+        Debug.Log(string.Format("(max_u, max_v) = ({0}, {1})", max_u, max_v));
     }
 }

@@ -51,7 +51,9 @@ public class PointCloudAnimation : MonoBehaviour
         {
             clouds = new PointCloudCollection();
             //clouds.LoadFromPLY("30-03-2023T19_00");
-            clouds.LoadFromPLY("CoffeBox_downsampled");
+            clouds.AddPointCloud(new PointCloud("Assets/Resources/PointClouds/CoffeBox_downsampled/000000.ply"));
+            clouds.AddPointCloud(new PointCloud("Assets/Resources/PointClouds/CoffeBox_downsampled/000000.ply"));
+            Debug.Log("Got " + clouds.Count + " clouds");
 
             Matrix4x4 M = new Matrix4x4(
                     new Vector4(636.65930176f, 0, 0, 0),
@@ -63,6 +65,7 @@ public class PointCloudAnimation : MonoBehaviour
             tex.LoadImage(File.ReadAllBytes("Assets/Resources/000000.png"));
             clouds.Get(0).ColorFromImage(tex, M);
         }
+        //Debug.Log("Got " + clouds.Count + " clouds");
 
         PointCloud current = clouds.Get(current_idx);
         pointCloudRenderer.Render(current.Points, current.Colors);

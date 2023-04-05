@@ -24,11 +24,8 @@ public class PointCloudCollection
 
     /// <summary>
     /// Appends point cloud collection with new point cloud.
-    /// Additionally, filters out points that are further away
-    /// than some threshold
     /// </summary>
     /// <param name="pointCloud">The coordinates of the point captured</param>
-    /// <param name="distance_threshold">Maximal distance at which points are still included</param>
     public void AddPointCloud(PointCloud pc)
     {
         clouds.Add(pc);
@@ -58,7 +55,7 @@ public class PointCloudCollection
     {
         if (index < 0  || index >= clouds.Count)
         {
-            throw new ArgumentOutOfRangeException(string.Format("Index must be between 0 and {0}", clouds.Count - 1));
+            throw new ArgumentOutOfRangeException(string.Format("Index {0} is out of range for collection of size {1}", index, clouds.Count));
         }
         return (PointCloud)clouds[index];
     }
