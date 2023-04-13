@@ -6,6 +6,7 @@ using UnityEngine.UIElements;
 using Tutorials;
 using System.Runtime.InteropServices.ComTypes;
 using System.Net.NetworkInformation;
+using Microsoft.MixedReality.Toolkit.Audio;
 
 public class PointCloud
 {
@@ -133,6 +134,7 @@ public class PointCloud
 
     public void ColorFromImage(Texture2D texture, Matrix4x4 cameraMatrix)
     {
+        Debug.Log(cameraMatrix);
         // Ignore previous color information
         colors.Clear();
 
@@ -144,6 +146,8 @@ public class PointCloud
 
         float u_offset = cameraMatrix[0, 2];
         float v_offset = cameraMatrix[1, 2];
+        //float u_offset = 0;
+        //float v_offset = 0;
 
         foreach (Vector3 point in points)
         {
@@ -160,6 +164,14 @@ public class PointCloud
             float u = (projected.x + u_offset);
             float v = (projected.y + v_offset);
 
+            // Normalize
+            u /= texture.width;
+            v /= texture.height;
+
+            // flip
+            //u = 1 - u;
+            v = 1 - v;
+
             // TODO: remove, only for debugging purposes
             min_u = Math.Min(u, min_u);
             min_v = Math.Min(v, min_v);
@@ -168,12 +180,20 @@ public class PointCloud
             //Debug.Log(string.Format("Getting pixel at ({0}, {1})", u, v));
 
             // Assign the current point the right color corresponding to its projection onto 
-            // the image plane
-            colors.Add(texture.GetPixelBilinear(u, v));
+            // the image plane, ignore points that fall outside of the image plane
+            if (u >= texture.width || u < 0 || v > texture.height || v < 0)
+            {
+                // Todo: change to alpha = 0
+                colors.Add(Color.black);
+            } else
+            {
+                colors.Add(texture.GetPixelBilinear(u, v));
+            }
         }
-        Debug.Log(string.Format("Texture has dimensions: {0} x {1}", texture.width, texture.height));
-        Debug.Log(string.Format("Center is at ({0}, {1})", u_offset, v_offset));
-        Debug.Log(string.Format("(min_u, min_v) = ({0}, {1})", min_u, min_v));
-        Debug.Log(string.Format("(max_u, max_v) = ({0}, {1})", max_u, max_v));
+
+        //Debug.Log(string.Format("Texture has dimensions: {0} x {1}", texture.width, texture.height));
+        //Debug.Log(string.Format("Center is at ({0}, {1})", u_offset, v_offset));
+        //Debug.Log(string.Format("(min_u, min_v) = ({0}, {1})", min_u, min_v));
+        //Debug.Log(string.Format("(max_u, max_v) = ({0}, {1})", max_u, max_v));
     }
 }

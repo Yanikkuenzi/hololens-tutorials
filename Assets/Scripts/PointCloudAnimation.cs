@@ -51,9 +51,8 @@ public class PointCloudAnimation : MonoBehaviour
         {
             clouds = new PointCloudCollection();
             //clouds.LoadFromPLY("30-03-2023T19_00");
-            clouds.AddPointCloud(new PointCloud("Assets/Resources/PointClouds/CoffeBox_downsampled/000000.ply"));
-            clouds.AddPointCloud(new PointCloud("Assets/Resources/PointClouds/CoffeBox_downsampled/000000.ply"));
-            Debug.Log("Got " + clouds.Count + " clouds");
+            clouds.AddPointCloud(new PointCloud("Assets/Resources/PointClouds/Test/000000.ply"));
+            clouds.AddPointCloud(new PointCloud("Assets/Resources/PointClouds/Test/000000.ply"));
 
             Matrix4x4 M = new Matrix4x4(
                     new Vector4(636.65930176f, 0, 0, 0),
@@ -62,7 +61,7 @@ public class PointCloudAnimation : MonoBehaviour
                     new Vector4(0, 0, 0, 0));
             
             Texture2D tex = new Texture2D(1, 1);
-            tex.LoadImage(File.ReadAllBytes("Assets/Resources/000000.png"));
+            tex.LoadImage(File.ReadAllBytes("Assets/Resources/0.png"));
             clouds.Get(0).ColorFromImage(tex, M);
         }
         //Debug.Log("Got " + clouds.Count + " clouds");
