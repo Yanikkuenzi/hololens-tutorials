@@ -18,9 +18,14 @@ public class PointCloudAnimation : MonoBehaviour
     private PointCloudCollection clouds;
 
     private int current_idx = 0;
+    private int nFramesPerCloud = 60;
+    private int nFramesShown = 0;
 
     public bool repeat = false;
     public bool playing = false;
+
+    // TODO: remove
+    public double distance = .5;
 
     public GameObject pointCloudRendererGo;
     private PointCloudRenderer pointCloudRenderer;
@@ -51,21 +56,29 @@ public class PointCloudAnimation : MonoBehaviour
         {
             clouds = new PointCloudCollection();
             //clouds.LoadFromPLY("30-03-2023T19_00");
-            clouds.AddPointCloud(new PointCloud("Assets/Resources/PointClouds/Test/000000.ply"));
-            clouds.AddPointCloud(new PointCloud("Assets/Resources/PointClouds/Test/000000.ply"));
+            clouds.AddPointCloud(new PointCloud("Assets/Resources/PointClouds/26-04-2023T05_30/000025.ply"));
+            clouds.AddPointCloud(new PointCloud("Assets/Resources/PointClouds/26-04-2023T05_30/000025.ply"));
 
-            Matrix4x4 M = new Matrix4x4(
-                    new Vector4(636.65930176f, 0, 0, 0),
-                    new Vector4(0, 636.25195312f, 0, 0),
-                    new Vector4(635.28388188f, 366.87403535f, 1, 0),
-                    new Vector4(0, 0, 0, 0));
-            
-            Texture2D tex = new Texture2D(1, 1);
-            tex.LoadImage(File.ReadAllBytes("Assets/Resources/0.png"));
-            clouds.Get(0).ColorFromImage(tex, M);
+            clouds.Get(0).LeftHandPosition = new Vector3(-0.1f, -0.1f, 0.1f);
+            clouds.Get(0).RightHandPosition = new Vector3(0.1f, -0.1f, 0.2f);
+            clouds.Get(0).Segment(distance);
+            clouds.Get(0).Points.Add(new Vector3(-0.1f, -0.1f, 0.1f));
+            clouds.Get(0).Points.Add(new Vector3(0.1f, -0.1f, 0.2f));
+            clouds.Get(0).Colors.Add(Color.yellow);
+            clouds.Get(0).Colors.Add(Color.yellow);
         }
-        //Debug.Log("Got " + clouds.Count + " clouds");
 
+        // Don't update anything
+        if (nFramesShown != nFramesPerCloud)
+        {
+            nFramesShown++;
+            return;
+        }
+
+        // Reset counter
+        nFramesShown = 0;
+
+        // Render point cloud
         PointCloud current = clouds.Get(current_idx);
         pointCloudRenderer.Render(current.Points, current.Colors);
 
