@@ -24,6 +24,9 @@ public class AnimationRecorder : MonoBehaviour
     private Texture2D targetTexture = null;
     private CameraParameters cameraParameters;
     private bool cameraReady = false;
+    // TODO: remove
+    private int img_id = 0;
+    private int n = 0;
 
     private bool recording = false;
 #if ENABLE_WINMD_SUPPORT
@@ -55,7 +58,7 @@ public class AnimationRecorder : MonoBehaviour
         {
             InitResearchMode();
             dbg.Log("Trying to create PhotoCapture object");
-            //PhotoCapture.CreateAsync(false, OnPhotoCaptureCreated);
+            PhotoCapture.CreateAsync(false, OnPhotoCaptureCreated);
             dbg.Log("Camera setup and research mode initialization successful");
         }
         catch (Exception e)
@@ -115,6 +118,7 @@ public class AnimationRecorder : MonoBehaviour
     {
         // Copy the raw image data into our target texture
         captureFrame.UploadImageDataToTexture(targetTexture);
+        Debug.Log("Took picture");
 
         //// Create a gameobject that we can apply our texture to
         //GameObject quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -130,7 +134,7 @@ public class AnimationRecorder : MonoBehaviour
         // Write to PNG
         try
         {
-            dbg.Log("Trying to write PNG to file");
+            Debug.Log("Trying to write PNG to file");
             byte[] bytes = targetTexture.EncodeToPNG();
             string directory = "Assets/Resources/";
 #if ENABLE_WINMD_SUPPORT
@@ -138,13 +142,15 @@ public class AnimationRecorder : MonoBehaviour
             directory = objects_3d.Path + "/";
 #endif
 
-            File.WriteAllBytes(directory + string.Format("{}.png", current_animation.Count), bytes);
+            //File.WriteAllBytes(directory + string.Format("{0}.png", current_animation.Count), bytes);
+            string path = string.Format(directory + "image{0}.png", img_id++);
+            File.WriteAllBytes(path, bytes);
+            Debug.Log("Write successfull");
         }
         catch (Exception e)
         {
-            dbg.Log(e.ToString());
+            Debug.Log(e.ToString());
         }
-        dbg.Log("Write successfull");
 
     }
 
@@ -212,6 +218,7 @@ public class AnimationRecorder : MonoBehaviour
 #endif
 
         dbg.Log("Trying to take picture");
+        Debug.Log("n = " + n++);
         try
         {
             photoCaptureObject.TakePhotoAsync(OnCapturedPhotoToMemory);
@@ -221,12 +228,13 @@ public class AnimationRecorder : MonoBehaviour
         {
             dbg.Log("Caught exception: " + e.ToString());
         }
+        //recording = false;
     }
 
     public void ToggleRecording()
     {
-        dbg.Log("Toggled recording");
         recording = !recording;
+        dbg.Log("Toggled recording to be " + recording);
         // Write captured point cloud animation to disk
         if (!recording)
         {
