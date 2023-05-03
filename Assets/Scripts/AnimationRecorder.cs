@@ -2,12 +2,17 @@
 using System.Collections;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Windows.WebCam;
 
 #if ENABLE_WINMD_SUPPORT
 using HL2UnityPlugin;
 using Windows.Storage;
+using Windows.Storage.Streams;
+using Windows.Media.Capture;
+using Windows.Media.MediaProperties;
+using Windows.Graphics.Imaging;
 using System.Runtime.InteropServices;
 using Microsoft.MixedReality.Toolkit.Utilities;
 using Microsoft.MixedReality.Toolkit.Input;
@@ -21,15 +26,19 @@ public class AnimationRecorder : MonoBehaviour
     private PointCloudCollection current_animation;
 
     private PhotoCapture photoCaptureObject = null;
+    //private VideoCapture videoCaptureObject = null;
+    // TODO: remove
+    int frames;
+    int picture = 0;
     private Texture2D targetTexture = null;
     private CameraParameters cameraParameters;
-    private bool cameraReady = false;
-    // TODO: remove
-    private int img_id = 0;
-    private int n = 0;
+    private DateTime recordingStart;
+
 
     private bool recording = false;
 #if ENABLE_WINMD_SUPPORT
+        private MediaCapture mediaCapture;
+        private LowLagPhotoCapture photoCapture;
         HL2ResearchMode researchMode;
         Windows.Perception.Spatial.SpatialCoordinateSystem unityWorldOrigin;
 #endif
@@ -37,6 +46,12 @@ public class AnimationRecorder : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+#if ENABLE_WINMD_SUPPORT
+    Debug.Log("WINMD SUPPORT enabled");
+#else
+    Debug.Log("WINMD SUPPORT NOT enabled!!!!");
+#endif 
+
         if (dbg == null)
         {
             dbg = logger.GetComponent<DebugOutput>();
@@ -46,6 +61,9 @@ public class AnimationRecorder : MonoBehaviour
 #if ENABLE_WINMD_SUPPORT
         IntPtr WorldOriginPtr = UnityEngine.XR.WindowsMR.WindowsMREnvironment.OriginSpatialCoordinateSystem;
         unityWorldOrigin = Marshal.GetObjectForIUnknown(WorldOriginPtr) as Windows.Perception.Spatial.SpatialCoordinateSystem;
+
+        // Initialize camera
+        InitCamera();
 #endif
         // Set up everything for capturing images, giving color to point cloud
         // See: https://docs.unity3d.com/2019.4/Documentation/ScriptReference/Windows.WebCam.PhotoCapture.html
@@ -57,9 +75,8 @@ public class AnimationRecorder : MonoBehaviour
         try
         {
             InitResearchMode();
-            dbg.Log("Trying to create PhotoCapture object");
-            PhotoCapture.CreateAsync(false, OnPhotoCaptureCreated);
-            dbg.Log("Camera setup and research mode initialization successful");
+            //PhotoCapture.CreateAsync(false, OnPhotoCaptureCreated);
+            //dbg.Log("Camera setup and research mode initialization successful");
         }
         catch (Exception e)
         {
@@ -68,93 +85,7 @@ public class AnimationRecorder : MonoBehaviour
 
     }
 
-    private void OnPhotoCaptureCreated(PhotoCapture captureObject)
-    {
-        if (captureObject == null)
-        {
-            dbg.Log("Failed to create CaptureObject!");
-            return;
-        }
-        dbg.Log("Initializing camera");
-
-        try
-        {
-            this.photoCaptureObject = captureObject;
-            Resolution res = PhotoCapture.SupportedResolutions.OrderByDescending(resolution => resolution.width * resolution.height).First();
-            CameraParameters cameraParams = new CameraParameters(WebCamMode.PhotoMode);
-            cameraParameters.hologramOpacity = 0f;
-            cameraParameters.cameraResolutionWidth = res.width;
-            cameraParameters.cameraResolutionHeight = res.height;
-            cameraParameters.pixelFormat = CapturePixelFormat.BGRA32;
-            this.targetTexture = new Texture2D(res.width, res.height);
-
-            photoCaptureObject.StartPhotoModeAsync(cameraParameters, OnPhotoModeStarted);
-            dbg.Log("Initialization done");
-        }
-        catch (Exception e)
-        {
-            dbg.Log("Failed to initialize camera: " + e.ToString());
-        }
-    }
-
-    private void OnPhotoModeStarted(PhotoCapture.PhotoCaptureResult res)
-    {
-        this.cameraReady = res.success;
-        dbg.Log(cameraReady ? "Initialization successful" : "Initialization failed");
-    }
-
-    private void TakePhoto()
-    {
-        if (!cameraReady)
-        {
-            dbg.Log("Could not take photo becuase camera is not ready!");
-            return;
-        }
-
-        photoCaptureObject.TakePhotoAsync(OnCapturedPhotoToMemory);
-    }
-
-    private void OnCapturedPhotoToMemory(PhotoCapture.PhotoCaptureResult res, PhotoCaptureFrame captureFrame)
-    {
-        // Copy the raw image data into our target texture
-        captureFrame.UploadImageDataToTexture(targetTexture);
-        Debug.Log("Took picture");
-
-        //// Create a gameobject that we can apply our texture to
-        //GameObject quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        //Renderer quadRenderer = quad.GetComponent<Renderer>() as Renderer;
-        //quadRenderer.material = new Material(Shader.Find("Unlit/Texture"));
-
-        //quad.transform.parent = this.transform;
-        //quad.transform.localPosition = new Vector3(0.0f, 0.0f, 3.0f);
-
-        //quadRenderer.material.SetTexture("_MainTex", targetTexture);
-        //dbg.Log("Captured image shown");
-
-        // Write to PNG
-        try
-        {
-            Debug.Log("Trying to write PNG to file");
-            byte[] bytes = targetTexture.EncodeToPNG();
-            string directory = "Assets/Resources/";
-#if ENABLE_WINMD_SUPPORT
-            StorageFolder objects_3d = KnownFolders.Objects3D;
-            directory = objects_3d.Path + "/";
-#endif
-
-            //File.WriteAllBytes(directory + string.Format("{0}.png", current_animation.Count), bytes);
-            string path = string.Format(directory + "image{0}.png", img_id++);
-            File.WriteAllBytes(path, bytes);
-            Debug.Log("Write successfull");
-        }
-        catch (Exception e)
-        {
-            Debug.Log(e.ToString());
-        }
-
-    }
-
-    void LateUpdate()
+    void Update()
     {
         if (!recording)
             return;
@@ -181,6 +112,7 @@ public class AnimationRecorder : MonoBehaviour
                 return;
             }
 
+            DateTime time = DateTime.Now;
             float[] points = researchMode.GetPointCloudBuffer();
             if (points == null)
             {
@@ -188,11 +120,13 @@ public class AnimationRecorder : MonoBehaviour
                 return;
             }
 
-
             dbg.Log(string.Format("{0} points in PointCloudBuffer", points.Length));
 
+            // Capture RGB image
+            CapturePhoto();
+
             // Create point cloud and add to animation
-            PointCloud pointCloud = new PointCloud(points, .5);
+            PointCloud pointCloud = new PointCloud(points, .5, time);
             // Get hand positions for segmentation
             MixedRealityPose pose;
             if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Wrist, Handedness.Left, out pose))
@@ -216,30 +150,102 @@ public class AnimationRecorder : MonoBehaviour
             dbg.Log(e.ToString());
         }
 #endif
+        // TODO: remove
+        recording = false;
+    }
 
-        dbg.Log("Trying to take picture");
-        Debug.Log("n = " + n++);
+#if ENABLE_WINMD_SUPPORT
+    async Task InitCamera()
+    {
         try
         {
-            photoCaptureObject.TakePhotoAsync(OnCapturedPhotoToMemory);
-            dbg.Log("Successfully took picture");
+            mediaCapture = new MediaCapture();
+            await mediaCapture.InitializeAsync();
+            mediaCapture.Failed += (MediaCapture sender, MediaCaptureFailedEventArgs errorEventArgs) =>
+            {
+                dbg.Log($"MediaCapture initialization failed: {errorEventArgs.Message}");
+            };
+
+            dbg.Log("PhotoCapture initialization done!");
         }
         catch (Exception e)
         {
-            dbg.Log("Caught exception: " + e.ToString());
+            dbg.Log(e.ToString());
         }
-        //recording = false;
     }
+
+    async Task CapturePhoto()
+    {
+        try
+        {
+            photoCapture = await mediaCapture.PrepareLowLagPhotoCaptureAsync(ImageEncodingProperties.CreateJpeg());
+            var capturedPhoto = await photoCapture.CaptureAsync();
+
+            var myPictures = await Windows.Storage.StorageLibrary.GetLibraryAsync(Windows.Storage.KnownLibraryId.Pictures);
+            StorageFile file = await myPictures.SaveFolder.CreateFileAsync($"photo_{picture++}.jpg", CreationCollisionOption.GenerateUniqueName);
+
+            var softwareBitmap = capturedPhoto.Frame.SoftwareBitmap;
+
+            dbg.Log($"Frame is {softwareBitmap.PixelWidth} x {softwareBitmap.PixelHeight} pixels");
+            SaveSoftwareBitmapToFile(softwareBitmap, file);
+            await photoCapture.FinishAsync();
+        }
+        catch (Exception e)
+        {
+            dbg.Log(e.ToString());
+        }
+    }
+
+    private async void SaveSoftwareBitmapToFile(SoftwareBitmap softwareBitmap, StorageFile outputFile)
+    {
+        using (IRandomAccessStream stream = await outputFile.OpenAsync(FileAccessMode.ReadWrite))
+        {
+            // Create an encoder with the desired format
+            BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, stream);
+
+            // Set the software bitmap
+            encoder.SetSoftwareBitmap(softwareBitmap);
+
+            encoder.IsThumbnailGenerated = true;
+
+            try
+            {
+                await encoder.FlushAsync();
+            }
+            catch (Exception err)
+            {
+                const int WINCODEC_ERR_UNSUPPORTEDOPERATION = unchecked((int)0x88982F81);
+                switch (err.HResult)
+                {
+                    case WINCODEC_ERR_UNSUPPORTEDOPERATION: 
+                        // If the encoder does not support writing a thumbnail, then try again
+                        // but disable thumbnail generation.
+                        encoder.IsThumbnailGenerated = false;
+                        break;
+                    default:
+                        throw;
+                }
+            }
+
+            if (encoder.IsThumbnailGenerated == false)
+            {
+                await encoder.FlushAsync();
+            }
+
+
+        }
+    }
+#endif
 
     public void ToggleRecording()
     {
         recording = !recording;
-        dbg.Log("Toggled recording to be " + recording);
         // Write captured point cloud animation to disk
         if (!recording)
         {
             try
             {
+                dbg.Log(string.Format("Recorded {0} frames in {1}s", frames, (DateTime.Now - recordingStart).TotalSeconds));
                 dbg.Log(string.Format("Started export of {0} point clouds", current_animation.Count));
                 current_animation.ExportToPLY(DateTime.Now.ToString("dd-MM-yyyyTHH_mm"));
                 dbg.Log("Finished export");
@@ -252,6 +258,27 @@ public class AnimationRecorder : MonoBehaviour
                 dbg.Log(e.ToString());
             }
         }
+        else
+        {
+            recordingStart = DateTime.Now;
+            frames = 0;
+        }
+        // TODO: fix this
+//        else // Start video recording
+//        {
+//            string filename = "recording.mp4";
+//#if ENABLE_WINMD_SUPPORT
+//            StorageFolder objects_3d = KnownFolders.Objects3D;
+//            string filepath = objects_3d.Path + "/" + filename;
+//#else
+//            string filepath = System.IO.Path.Combine(Application.persistentDataPath, filename);
+//#endif
+//            filepath = filepath.Replace("/", @"\");
+//            dbg.Log("Storing video to " + filepath);
+//            // recoring is set to true in the OnStartRecordingVideo function
+//            videoCaptureObject.StartRecordingAsync(filepath, OnStartedRecordingVideo);
+//            dbg.Log("Started recording at " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss,fff"));
+//        }
     }
     private void InitResearchMode()
     {
@@ -272,63 +299,168 @@ public class AnimationRecorder : MonoBehaviour
         }
 #endif
     }
-    void OnStoppedPhotoMode(PhotoCapture.PhotoCaptureResult result)
-    {
-        // Shutdown our photo capture resource
-        dbg.Log("Shutting down camera");
-        photoCaptureObject.Dispose();
-        photoCaptureObject = null;
-        cameraReady = false;
-    }
 
     private void OnApplicationQuit()
     {
         dbg.Log("Called OnApplicationQuit");
-        StartCoroutine(waiter());
+
         // Stop the photo mode and dispose of the photo capture object
-        if (photoCaptureObject != null)
+        if (photoCaptureObject == null) 
         {
             photoCaptureObject.StopPhotoModeAsync(OnStoppedPhotoMode);
         }
+        //if (videoCaptureObject != null)
+        //{
+        //    videoCaptureObject.StopVideoModeAsync(OnStoppedVideoCaptureMode);
+        //}
     }
 
     void OnDestroy()
     {
         dbg.Log("Called OnDestroy");
-        StartCoroutine(waiter());
 
         // Stop the photo mode and dispose of the photo capture object
-        if (photoCaptureObject != null)
+        if (photoCaptureObject == null) 
         {
             photoCaptureObject.StopPhotoModeAsync(OnStoppedPhotoMode);
         }
+        //if (videoCaptureObject != null)
+        //{
+        //    videoCaptureObject.StopVideoModeAsync(OnStoppedVideoCaptureMode);
+        //}
+
     }
 
-    void OnEnable()
+
+
+    // TODO: remove
+
+    // PhotoCapture methods
+    void OnPhotoCaptureCreated(PhotoCapture captureObject)
     {
-        dbg.Log("Enabled");
-        Application.logMessageReceived += HandleLog;
+        photoCaptureObject = captureObject;
+
+        // Choose highest available resolution
+        Resolution cameraResolution = PhotoCapture.SupportedResolutions.OrderByDescending((res) => res.width * res.height).First();
+
+        CameraParameters c = new CameraParameters();
+        c.cameraResolutionWidth = cameraResolution.width;
+        c.cameraResolutionHeight = cameraResolution.height;
+        c.pixelFormat = CapturePixelFormat.BGRA32;
+
+        captureObject.StartPhotoModeAsync(c, OnPhotoModeStarted);
     }
 
-    void OnDisable()
+    private void OnPhotoModeStarted(PhotoCapture.PhotoCaptureResult result)
     {
-        Application.logMessageReceived -= HandleLog;
-    }
-
-    void HandleLog(string logString, string stackTrace, LogType type)
-    {
-        dbg.Log("Log: " + logString);
-        if (type == LogType.Error || type == LogType.Exception)
+        if (!result.success)
         {
-            // Handle the error or exception here
-            dbg.Log("Unity Error: " + logString + "\n" + stackTrace);
+            dbg.Log("PhotoMode started");
+        }
+        else
+        {
+            Debug.Log(result);
+            dbg.Log("Unable to start photo mode!1!!!1!");
         }
     }
 
-    IEnumerator waiter()
+    void OnPhotoCaptured(PhotoCapture.PhotoCaptureResult result, PhotoCaptureFrame photoCaptureFrame)
     {
-        yield return new WaitForSeconds(4);
+        if (result.success)
+        {
+            // Create our Texture2D for use and set the correct resolution
+            //Resolution cameraResolution = PhotoCapture.SupportedResolutions.OrderByDescending((res) => res.width * res.height).First();
+            //Texture2D targetTexture = new Texture2D(cameraResolution.width, cameraResolution.height);
+            // Copy the raw image data into our target texture
+            //photoCaptureFrame.UploadImageDataToTexture(targetTexture);
+            //photoCaptureFrame.
+            ++frames;
+        }
     }
+
+    void OnStoppedPhotoMode(PhotoCapture.PhotoCaptureResult result)
+    {
+        photoCaptureObject.Dispose();
+        photoCaptureObject = null;
+    }
+
+    void CreateFrameObject(Texture2D frameTexture)
+    {
+        // Create a new Quad GameObject
+        GameObject frameObject = GameObject.CreatePrimitive(PrimitiveType.Quad);
+
+        // Assign the frame texture to the Quad's material
+        frameObject.GetComponent<Renderer>().material.mainTexture = frameTexture;
+
+        // Set the position and scale of the Quad
+        frameObject.transform.position = new Vector3(0, 0, 5);
+        frameObject.transform.localScale = new Vector3(2, 2, 1);
+    }
+
+    //void InitVideoCapture()
+    //{
+    //    try
+    //    {
+    //        VideoCapture.CreateAsync(false, OnVideoCaptureCreated);
+    //    }
+    //    catch (Exception e)
+    //    {
+    //        dbg.Log(e.Message);
+    //    }
+    //}
+
+    //void OnVideoCaptureCreated(VideoCapture videoCapture)
+    //{
+    //    Resolution cameraResolution = VideoCapture.SupportedResolutions.OrderByDescending((res) => res.width * res.height).First();
+    //    dbg.Log("Using resolution: " + cameraResolution);
+
+    //    float cameraFramerate = VideoCapture.GetSupportedFrameRatesForResolution(cameraResolution).OrderByDescending((fps) => fps).First();
+    //    dbg.Log("Using framerate: " + cameraFramerate);
+
+    //    dbg.Log("OnVideoCaptureCreated");
+    //    if (videoCapture != null)
+    //    {
+    //        videoCaptureObject = videoCapture;
+    //        dbg.Log("Created VideoCapture Instance!");
+
+    //        CameraParameters cameraParameters = new CameraParameters();
+    //        cameraParameters.hologramOpacity = 0.0f;
+    //        cameraParameters.frameRate = cameraFramerate;
+    //        cameraParameters.cameraResolutionWidth = cameraResolution.width;
+    //        cameraParameters.cameraResolutionHeight = cameraResolution.height;
+    //        cameraParameters.pixelFormat = CapturePixelFormat.BGRA32;
+
+    //        videoCaptureObject.StartVideoModeAsync(cameraParameters,
+    //            VideoCapture.AudioState.None,
+    //            OnStartedVideoCaptureMode);
+    //    }
+    //    else
+    //    {
+    //        dbg.Log("ERROR: Failed to create VideoCapture Instance!");
+    //    }
+    //}
+
+    //void OnStartedVideoCaptureMode(VideoCapture.VideoCaptureResult result)
+    //{
+    //    dbg.Log("Started Video Capture Mode!");
+    //}
+
+    //void OnStoppedVideoCaptureMode(VideoCapture.VideoCaptureResult result)
+    //{
+    //    dbg.Log("Stopped Video Capture Mode!");
+    //}
+
+    //void OnStartedRecordingVideo(VideoCapture.VideoCaptureResult result)
+    //{
+    //    videoStart = DateTime.Now;
+    //    recording = true;
+    //    dbg.Log("Started Recording Video at " + videoStart.ToString());
+    //}
+
+    //void OnStoppedRecordingVideo(VideoCapture.VideoCaptureResult result)
+    //{
+    //    dbg.Log("Stopped Recording Video!");
+    //}
 
 }
 

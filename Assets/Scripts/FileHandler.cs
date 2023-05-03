@@ -249,10 +249,12 @@ namespace Tutorials
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public static void LoadPointsFromPLY(string path, out ArrayList points, out ArrayList colors)
+        // TODO: remove time stamp as return value
+        public static DateTime LoadPointsFromPLY(string path, out ArrayList points, out ArrayList colors)
         {
             points = null;
             colors = null;
+            DateTime time = DateTime.Now;
 
             // After this prefix, the number of vertices is specified
             const string length_prefix = "element vertex ";
@@ -313,6 +315,17 @@ namespace Tutorials
                                 Debug.Log("Number of vertices must be an integer");
                             }
                         }
+
+                        // TODO: remove
+                        string time_pref = "Comment Time: ";
+                        int time_pref_len = time_pref.Length;
+                        if (line.Length > time_pref_len && line.Substring(0, time_pref_len ).Equals(time_pref))
+                        {
+                            //Debug.Log("Time is " + line.Substring(time_pref_len));
+                            time = DateTime.ParseExact(line.Substring(time_pref_len), "yyyy-MM-dd HH:mm:ss,fff",
+                                       System.Globalization.CultureInfo.InvariantCulture);
+                            //Debug.Log("Parsed time is " + time);
+                        }
                     }
                 }
             }
@@ -320,6 +333,7 @@ namespace Tutorials
             {
                 Debug.LogError(ex.Message);
             }
+            return time;
         }
 
         private static (Vector3?, Color) ParseLine(string line)

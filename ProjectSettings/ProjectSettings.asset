@@ -588,9 +588,9 @@ PlayerSettings:
   metroPackageVersion: 1.0.0.0
   metroCertificatePath: Assets\WSATestCertificate.pfx
   metroCertificatePassword: 
-  metroCertificateSubject: Wenhao
-  metroCertificateIssuer: Wenhao
-  metroCertificateNotAfter: 806868ea717cd901
+  metroCertificateSubject: DefaultCompany
+  metroCertificateIssuer: DefaultCompany
+  metroCertificateNotAfter: 00f972c7b79cda01
   metroApplicationDescription: 4d-holographic-tutorials
   wsaImages: {}
   metroTileShortName: 4d-holographic-tutorials

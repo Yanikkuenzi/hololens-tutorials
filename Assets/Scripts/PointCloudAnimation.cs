@@ -18,7 +18,7 @@ public class PointCloudAnimation : MonoBehaviour
     private PointCloudCollection clouds;
 
     private int current_idx = 0;
-    private int nFramesPerCloud = 60;
+    private int nFramesPerCloud = 30;
     private int nFramesShown = 0;
 
     public bool repeat = false;
@@ -36,37 +36,16 @@ public class PointCloudAnimation : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        if (pointCloudRenderer == null)
-        {
-            pointCloudRenderer = pointCloudRendererGo.GetComponent<PointCloudRenderer>();
-            pointCloudRendererGo.SetActive(playing);
-        }
+        pointCloudRenderer = pointCloudRendererGo.GetComponent<PointCloudRenderer>();
+        pointCloudRendererGo.SetActive(playing);
+        dbg = logger.GetComponent<DebugOutput>();
 
-        if(dbg == null)
-        {
-            dbg = logger.GetComponent<DebugOutput>();
-        }
     }
 
     // Update is called once per frame
     void Update()
     {
         if (!playing) return;
-        if (clouds == null)
-        {
-            clouds = new PointCloudCollection();
-            //clouds.LoadFromPLY("30-03-2023T19_00");
-            clouds.AddPointCloud(new PointCloud("Assets/Resources/PointClouds/26-04-2023T05_30/000025.ply"));
-            clouds.AddPointCloud(new PointCloud("Assets/Resources/PointClouds/26-04-2023T05_30/000025.ply"));
-
-            clouds.Get(0).LeftHandPosition = new Vector3(-0.1f, -0.1f, 0.1f);
-            clouds.Get(0).RightHandPosition = new Vector3(0.1f, -0.1f, 0.2f);
-            clouds.Get(0).Segment(distance);
-            clouds.Get(0).Points.Add(new Vector3(-0.1f, -0.1f, 0.1f));
-            clouds.Get(0).Points.Add(new Vector3(0.1f, -0.1f, 0.2f));
-            clouds.Get(0).Colors.Add(Color.yellow);
-            clouds.Get(0).Colors.Add(Color.yellow);
-        }
 
         // Don't update anything
         if (nFramesShown != nFramesPerCloud)
@@ -91,6 +70,13 @@ public class PointCloudAnimation : MonoBehaviour
 
     public void TogglePointCloud()
     {
+        if (clouds == null)
+        {
+            clouds = new PointCloudCollection();
+            clouds.LoadFromPLY("01-05-2023T09_21");
+            clouds.ColorFromVideo("Assets/Resources/recording_2.mp4");
+            Debug.Log("Loaded color from video");
+        }
         playing = !playing;
         pointCloudRendererGo.SetActive(playing);
     }
