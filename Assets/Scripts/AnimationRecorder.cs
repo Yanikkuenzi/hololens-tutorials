@@ -34,12 +34,12 @@ public class AnimationRecorder : MonoBehaviour
     private CameraParameters cameraParameters;
     private DateTime recordingStart;
 
-
     private bool recording = false;
 #if ENABLE_WINMD_SUPPORT
         private MediaCapture mediaCapture;
         private LowLagPhotoCapture photoCapture;
         HL2ResearchMode researchMode;
+        bool isCapturing;
         Windows.Perception.Spatial.SpatialCoordinateSystem unityWorldOrigin;
 #endif
 
@@ -123,7 +123,8 @@ public class AnimationRecorder : MonoBehaviour
             dbg.Log(string.Format("{0} points in PointCloudBuffer", points.Length));
 
             // Capture RGB image
-            CapturePhoto();
+            StartCoroutine(CapturePhotoCoroutine());
+            //CapturePhoto();
 
             // Create point cloud and add to animation
             PointCloud pointCloud = new PointCloud(points, .5, time);
@@ -150,8 +151,6 @@ public class AnimationRecorder : MonoBehaviour
             dbg.Log(e.ToString());
         }
 #endif
-        // TODO: remove
-        recording = false;
     }
 
 #if ENABLE_WINMD_SUPPORT
@@ -166,6 +165,7 @@ public class AnimationRecorder : MonoBehaviour
                 dbg.Log($"MediaCapture initialization failed: {errorEventArgs.Message}");
             };
 
+            photoCapture = await mediaCapture.PrepareLowLagPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
             dbg.Log("PhotoCapture initialization done!");
         }
         catch (Exception e)
@@ -174,25 +174,61 @@ public class AnimationRecorder : MonoBehaviour
         }
     }
 
+    IEnumerator CapturePhotoCoroutine()
+    {
+        // Wait until previous photo is taken
+        //if (isCapturing) yield break;
+        //isCapturing = true;
+        var capturePhotoTask = CapturePhoto();
+        while (!capturePhotoTask.IsCompleted)
+        {
+            yield return null;
+        }
+        //isCapturing = false;
+    }
+
     async Task CapturePhoto()
     {
         try
         {
-            photoCapture = await mediaCapture.PrepareLowLagPhotoCaptureAsync(ImageEncodingProperties.CreateJpeg());
+            if (mediaCapture == null) {
+                dbg.Log("MediaCapture is null!");
+                return;
+            }
+            if (photoCapture == null) {
+                dbg.Log("PhotoCapture is null!");
+                return;
+            }
             var capturedPhoto = await photoCapture.CaptureAsync();
+            if (capturedPhoto == null) {
+                dbg.Log("capturedPhoto is null!");
+                return;
+            }
+
+            // TODO: remove?
+            if (capturedPhoto.Frame == null) {
+                dbg.Log("Frame is null!");
+                return;
+            }
+            //dbg.Log($"Frame has dimensions: {capturedPhoto.Frame.Width} x {capturedPhoto.Frame.Height}, can be read = {capturedPhoto.Frame.CanRead}");
 
             var myPictures = await Windows.Storage.StorageLibrary.GetLibraryAsync(Windows.Storage.KnownLibraryId.Pictures);
             StorageFile file = await myPictures.SaveFolder.CreateFileAsync($"photo_{picture++}.jpg", CreationCollisionOption.GenerateUniqueName);
 
-            var softwareBitmap = capturedPhoto.Frame.SoftwareBitmap;
 
-            dbg.Log($"Frame is {softwareBitmap.PixelWidth} x {softwareBitmap.PixelHeight} pixels");
+            var softwareBitmap = capturedPhoto.Frame.SoftwareBitmap;
+            if (softwareBitmap == null) {
+                dbg.Log("softwareBitmap is null!");
+                return;
+            }
+
+            //dbg.Log($"Frame is {softwareBitmap.PixelWidth} x {softwareBitmap.PixelHeight} pixels");
             SaveSoftwareBitmapToFile(softwareBitmap, file);
-            await photoCapture.FinishAsync();
+            dbg.Log($"Current frame rate: {picture / (DateTime.Now - recordingStart).TotalSeconds}, StreamState = {mediaCapture.CameraStreamState}");
         }
         catch (Exception e)
         {
-            dbg.Log(e.ToString());
+            dbg.Log($"Caught exception in CapturePhoto: '{e.ToString()}' with camera stream state {mediaCapture.CameraStreamState}");
         }
     }
 
@@ -248,7 +284,6 @@ public class AnimationRecorder : MonoBehaviour
                 dbg.Log(string.Format("Recorded {0} frames in {1}s", frames, (DateTime.Now - recordingStart).TotalSeconds));
                 dbg.Log(string.Format("Started export of {0} point clouds", current_animation.Count));
                 current_animation.ExportToPLY(DateTime.Now.ToString("dd-MM-yyyyTHH_mm"));
-                dbg.Log("Finished export");
                 // Allocate new PC collection for next animation, freeing memory
                 // for animation that was just written
                 current_animation = new PointCloudCollection();
@@ -309,6 +344,9 @@ public class AnimationRecorder : MonoBehaviour
         {
             photoCaptureObject.StopPhotoModeAsync(OnStoppedPhotoMode);
         }
+#if ENABLE_WINMD_SUPPORT
+        photoCapture.FinishAsync();
+#endif
         //if (videoCaptureObject != null)
         //{
         //    videoCaptureObject.StopVideoModeAsync(OnStoppedVideoCaptureMode);
@@ -324,6 +362,9 @@ public class AnimationRecorder : MonoBehaviour
         {
             photoCaptureObject.StopPhotoModeAsync(OnStoppedPhotoMode);
         }
+#if ENABLE_WINMD_SUPPORT
+        photoCapture.FinishAsync();
+#endif
         //if (videoCaptureObject != null)
         //{
         //    videoCaptureObject.StopVideoModeAsync(OnStoppedVideoCaptureMode);
