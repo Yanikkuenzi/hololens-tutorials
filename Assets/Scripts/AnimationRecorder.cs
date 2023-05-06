@@ -64,6 +64,7 @@ public class AnimationRecorder : MonoBehaviour
 
         // Initialize camera
         InitCamera();
+        isCapturing = false;
 #endif
         // Set up everything for capturing images, giving color to point cloud
         // See: https://docs.unity3d.com/2019.4/Documentation/ScriptReference/Windows.WebCam.PhotoCapture.html
@@ -120,31 +121,34 @@ public class AnimationRecorder : MonoBehaviour
                 return;
             }
 
-            dbg.Log(string.Format("{0} points in PointCloudBuffer", points.Length));
+            //dbg.Log(string.Format("{0} points in PointCloudBuffer", points.Length));
 
             // Capture RGB image
             StartCoroutine(CapturePhotoCoroutine());
             //CapturePhoto();
 
+            ++frames;
+
+            // TODO: uncomment
             // Create point cloud and add to animation
-            PointCloud pointCloud = new PointCloud(points, .5, time);
-            // Get hand positions for segmentation
-            MixedRealityPose pose;
-            if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Wrist, Handedness.Left, out pose))
-            {
-                pointCloud.LeftHandPosition = pose.Position;
-            }
-            if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Wrist, Handedness.Right, out pose))
-            {
-                pointCloud.RightHandPosition  = pose.Position;
-            }
-            pointCloud.RandomDownSample(2000);
-            if (current_animation == null)
-            {
-                dbg.Log("current_animation is null");
-            }
-            current_animation.AddPointCloud(pointCloud);
-            dbg.Log("Added pointcloud to animation");
+            //PointCloud pointCloud = new PointCloud(points, .5, time);
+            //// Get hand positions for segmentation
+            //MixedRealityPose pose;
+            //if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Wrist, Handedness.Left, out pose))
+            //{
+            //    pointCloud.LeftHandPosition = pose.Position;
+            //}
+            //if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Wrist, Handedness.Right, out pose))
+            //{
+            //    pointCloud.RightHandPosition  = pose.Position;
+            //}
+            //pointCloud.RandomDownSample(2000);
+            //if (current_animation == null)
+            //{
+            //    dbg.Log("current_animation is null");
+            //}
+            //current_animation.AddPointCloud(pointCloud);
+            //dbg.Log("Added pointcloud to animation");
 
         } catch(Exception e)
         {
@@ -177,20 +181,22 @@ public class AnimationRecorder : MonoBehaviour
     IEnumerator CapturePhotoCoroutine()
     {
         // Wait until previous photo is taken
-        //if (isCapturing) yield break;
-        //isCapturing = true;
+        if (isCapturing) yield break;
+        isCapturing = true;
         var capturePhotoTask = CapturePhoto();
         while (!capturePhotoTask.IsCompleted)
         {
             yield return null;
         }
-        //isCapturing = false;
+        isCapturing = false;
     }
 
     async Task CapturePhoto()
     {
+        dbg.Log("In CapturePhoto()");
         try
         {
+            //var photoCapture = await mediaCapture.PrepareLowLagPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
             if (mediaCapture == null) {
                 dbg.Log("MediaCapture is null!");
                 return;
@@ -212,8 +218,8 @@ public class AnimationRecorder : MonoBehaviour
             }
             //dbg.Log($"Frame has dimensions: {capturedPhoto.Frame.Width} x {capturedPhoto.Frame.Height}, can be read = {capturedPhoto.Frame.CanRead}");
 
-            var myPictures = await Windows.Storage.StorageLibrary.GetLibraryAsync(Windows.Storage.KnownLibraryId.Pictures);
-            StorageFile file = await myPictures.SaveFolder.CreateFileAsync($"photo_{picture++}.jpg", CreationCollisionOption.GenerateUniqueName);
+            //var myPictures = await Windows.Storage.StorageLibrary.GetLibraryAsync(Windows.Storage.KnownLibraryId.Pictures);
+            //StorageFile file = await myPictures.SaveFolder.CreateFileAsync($"photo_{picture++}.jpg", CreationCollisionOption.GenerateUniqueName);
 
 
             var softwareBitmap = capturedPhoto.Frame.SoftwareBitmap;
@@ -223,8 +229,10 @@ public class AnimationRecorder : MonoBehaviour
             }
 
             //dbg.Log($"Frame is {softwareBitmap.PixelWidth} x {softwareBitmap.PixelHeight} pixels");
-            SaveSoftwareBitmapToFile(softwareBitmap, file);
-            dbg.Log($"Current frame rate: {picture / (DateTime.Now - recordingStart).TotalSeconds}, StreamState = {mediaCapture.CameraStreamState}");
+            //SaveSoftwareBitmapToFile(softwareBitmap, file);
+            //dbg.Log($"Saved image {picture} to file {file.Name}, Current frame rate: {picture / (DateTime.Now - recordingStart).TotalSeconds}, StreamState = {mediaCapture.CameraStreamState}");
+            dbg.Log($"Saved image {picture++} to file,  Current frame rate: {picture / (DateTime.Now - recordingStart).TotalSeconds}, StreamState = {mediaCapture.CameraStreamState}");
+            //photoCapture.FinishAsync();
         }
         catch (Exception e)
         {
@@ -281,9 +289,11 @@ public class AnimationRecorder : MonoBehaviour
         {
             try
             {
-                dbg.Log(string.Format("Recorded {0} frames in {1}s", frames, (DateTime.Now - recordingStart).TotalSeconds));
-                dbg.Log(string.Format("Started export of {0} point clouds", current_animation.Count));
-                current_animation.ExportToPLY(DateTime.Now.ToString("dd-MM-yyyyTHH_mm"));
+                dbg.Log(string.Format("Started export of {0} point clouds, frame rate = {1}",
+                    current_animation.Count,
+                    frames / (DateTime.Now - recordingStart).TotalSeconds));
+                // TODO: uncomment
+                //current_animation.ExportToPLY(DateTime.Now.ToString("dd-MM-yyyyTHH_mm"));
                 // Allocate new PC collection for next animation, freeing memory
                 // for animation that was just written
                 current_animation = new PointCloudCollection();

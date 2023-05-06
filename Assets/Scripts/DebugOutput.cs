@@ -7,8 +7,8 @@ using UnityEngine;
 public class DebugOutput : MonoBehaviour
 {
     public TextMeshPro output;
-    private int outputLimit = 10;
-    private Stack<(DateTime, string)> logs;
+    private int outputLimit = 20;
+    private Queue<(DateTime, string)> logs;
     private bool changed = false;
     // Start is called before the first frame update
     void Start()
@@ -17,7 +17,7 @@ public class DebugOutput : MonoBehaviour
 
     DebugOutput()
     {
-        logs = new Stack<(DateTime, string)>();
+        logs = new Queue<(DateTime, string)>();
     }
 
     // Update is called once per frame
@@ -38,9 +38,9 @@ public class DebugOutput : MonoBehaviour
     {
         if (logs.Count > outputLimit)
         {
-            logs.Pop();
+            logs.Dequeue();
         }
-        logs.Push((DateTime.Now, msg));
+        logs.Enqueue((DateTime.Now, msg));
         changed = true;
     }
 }
