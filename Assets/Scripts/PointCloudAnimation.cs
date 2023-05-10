@@ -74,8 +74,6 @@ public class PointCloudAnimation : MonoBehaviour
         {
             clouds = new PointCloudCollection();
             clouds.LoadFromPLY("01-05-2023T09_21");
-            clouds.ColorFromVideo("Assets/Resources/recording_2.mp4");
-            Debug.Log("Loaded color from video");
         }
         playing = !playing;
         pointCloudRendererGo.SetActive(playing);

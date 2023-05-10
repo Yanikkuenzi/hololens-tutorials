@@ -11,6 +11,7 @@ using HL2UnityPlugin;
 using Windows.Storage;
 using Windows.Storage.Streams;
 using Windows.Media.Capture;
+using Windows.Media.Capture.Frames;
 using Windows.Media.MediaProperties;
 using Windows.Graphics.Imaging;
 using System.Runtime.InteropServices;
@@ -38,9 +39,11 @@ public class AnimationRecorder : MonoBehaviour
 #if ENABLE_WINMD_SUPPORT
         private MediaCapture mediaCapture;
         private LowLagPhotoCapture photoCapture;
+        private MediaFrameReader videoFrameReader;
         HL2ResearchMode researchMode;
         bool isCapturing;
         Windows.Perception.Spatial.SpatialCoordinateSystem unityWorldOrigin;
+        ArrayList bitmaps;
 #endif
 
     // Start is called before the first frame update
@@ -63,6 +66,7 @@ public class AnimationRecorder : MonoBehaviour
         unityWorldOrigin = Marshal.GetObjectForIUnknown(WorldOriginPtr) as Windows.Perception.Spatial.SpatialCoordinateSystem;
 
         // Initialize camera
+        bitmaps = new ArrayList();
         InitCamera();
         isCapturing = false;
 #endif
@@ -76,8 +80,6 @@ public class AnimationRecorder : MonoBehaviour
         try
         {
             InitResearchMode();
-            //PhotoCapture.CreateAsync(false, OnPhotoCaptureCreated);
-            //dbg.Log("Camera setup and research mode initialization successful");
         }
         catch (Exception e)
         {
@@ -124,7 +126,7 @@ public class AnimationRecorder : MonoBehaviour
             //dbg.Log(string.Format("{0} points in PointCloudBuffer", points.Length));
 
             // Capture RGB image
-            StartCoroutine(CapturePhotoCoroutine());
+            //StartCoroutine(CapturePhotoCoroutine());
             //CapturePhoto();
 
             ++frames;
@@ -147,7 +149,7 @@ public class AnimationRecorder : MonoBehaviour
             //{
             //    dbg.Log("current_animation is null");
             //}
-            //current_animation.AddPointCloud(pointCloud);
+            current_animation.AddPointCloud(pointCloud);
             //dbg.Log("Added pointcloud to animation");
 
         } catch(Exception e)
@@ -162,15 +164,66 @@ public class AnimationRecorder : MonoBehaviour
     {
         try
         {
+            var frameSourceGroups = await MediaFrameSourceGroup.FindAllAsync();
+            var selectedGroupObjects = frameSourceGroups.Select(group =>
+               new
+               {
+                   sourceGroup = group,
+                   colorSourceInfo = group.SourceInfos.FirstOrDefault((sourceInfo) =>
+                   {
+                       return sourceInfo.MediaStreamType == MediaStreamType.VideoPreview
+                       && sourceInfo.SourceKind == MediaFrameSourceKind.Color;
+                   })
+
+               }).Where(t => t.colorSourceInfo != null)
+               .FirstOrDefault();
+
+            MediaFrameSourceGroup selectedGroup = selectedGroupObjects?.sourceGroup;
+            MediaFrameSourceInfo colorSourceInfo = selectedGroupObjects?.colorSourceInfo;
+
+            if (selectedGroup == null)
+            {
+                dbg.Log("Error: selectedGroup is null");
+                return;
+            }
+
             mediaCapture = new MediaCapture();
-            await mediaCapture.InitializeAsync();
+            var settings = new MediaCaptureInitializationSettings
+            {
+                SourceGroup = selectedGroup,
+                SharingMode = MediaCaptureSharingMode.ExclusiveControl,
+                MemoryPreference = MediaCaptureMemoryPreference.Cpu,
+                StreamingCaptureMode = StreamingCaptureMode.Video
+            };
+            await mediaCapture.InitializeAsync(settings);
+
+            var colorFrameSource = mediaCapture.FrameSources[colorSourceInfo.Id];
+            var preferredFormat = colorFrameSource.SupportedFormats.Where(format =>
+            {
+                return format.VideoFormat.Width < 1080
+                //&& format.Subtype == MediaEncodingSubtypes.Argb32
+                && (int)Math.Round((double)format.FrameRate.Numerator / format.FrameRate.Denominator) == 30;
+
+            }).FirstOrDefault();
+
+            if (preferredFormat == null)
+            {
+                // Our desired format is not supported
+                dbg.Log("Error: could not find format");
+                return;
+            }
+
+            dbg.Log($"Using format with Subtype {preferredFormat.Subtype}");
+
+            await colorFrameSource.SetFormatAsync(preferredFormat);
+
             mediaCapture.Failed += (MediaCapture sender, MediaCaptureFailedEventArgs errorEventArgs) =>
             {
                 dbg.Log($"MediaCapture initialization failed: {errorEventArgs.Message}");
             };
 
-            photoCapture = await mediaCapture.PrepareLowLagPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
-            dbg.Log("PhotoCapture initialization done!");
+            videoFrameReader = await mediaCapture.CreateFrameReaderAsync(colorFrameSource);
+            videoFrameReader.FrameArrived += FrameArrived;
         }
         catch (Exception e)
         {
@@ -178,83 +231,34 @@ public class AnimationRecorder : MonoBehaviour
         }
     }
 
-    IEnumerator CapturePhotoCoroutine()
+    async void SaveSoftwareBitmapToFile(SoftwareBitmap softwareBitmap, StorageFile outputFile)
     {
-        // Wait until previous photo is taken
-        if (isCapturing) yield break;
-        isCapturing = true;
-        var capturePhotoTask = CapturePhoto();
-        while (!capturePhotoTask.IsCompleted)
-        {
-            yield return null;
-        }
-        isCapturing = false;
-    }
-
-    async Task CapturePhoto()
-    {
-        dbg.Log("In CapturePhoto()");
-        try
-        {
-            //var photoCapture = await mediaCapture.PrepareLowLagPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
-            if (mediaCapture == null) {
-                dbg.Log("MediaCapture is null!");
-                return;
-            }
-            if (photoCapture == null) {
-                dbg.Log("PhotoCapture is null!");
-                return;
-            }
-            var capturedPhoto = await photoCapture.CaptureAsync();
-            if (capturedPhoto == null) {
-                dbg.Log("capturedPhoto is null!");
-                return;
-            }
-
-            // TODO: remove?
-            if (capturedPhoto.Frame == null) {
-                dbg.Log("Frame is null!");
-                return;
-            }
-            //dbg.Log($"Frame has dimensions: {capturedPhoto.Frame.Width} x {capturedPhoto.Frame.Height}, can be read = {capturedPhoto.Frame.CanRead}");
-
-            //var myPictures = await Windows.Storage.StorageLibrary.GetLibraryAsync(Windows.Storage.KnownLibraryId.Pictures);
-            //StorageFile file = await myPictures.SaveFolder.CreateFileAsync($"photo_{picture++}.jpg", CreationCollisionOption.GenerateUniqueName);
-
-
-            var softwareBitmap = capturedPhoto.Frame.SoftwareBitmap;
-            if (softwareBitmap == null) {
-                dbg.Log("softwareBitmap is null!");
-                return;
-            }
-
-            //dbg.Log($"Frame is {softwareBitmap.PixelWidth} x {softwareBitmap.PixelHeight} pixels");
-            //SaveSoftwareBitmapToFile(softwareBitmap, file);
-            //dbg.Log($"Saved image {picture} to file {file.Name}, Current frame rate: {picture / (DateTime.Now - recordingStart).TotalSeconds}, StreamState = {mediaCapture.CameraStreamState}");
-            dbg.Log($"Saved image {picture++} to file,  Current frame rate: {picture / (DateTime.Now - recordingStart).TotalSeconds}, StreamState = {mediaCapture.CameraStreamState}");
-            //photoCapture.FinishAsync();
-        }
-        catch (Exception e)
-        {
-            dbg.Log($"Caught exception in CapturePhoto: '{e.ToString()}' with camera stream state {mediaCapture.CameraStreamState}");
-        }
-    }
-
-    private async void SaveSoftwareBitmapToFile(SoftwareBitmap softwareBitmap, StorageFile outputFile)
-    {
+        dbg.Log($"Software bitmap has dimension {softwareBitmap.PixelWidth} x {softwareBitmap.PixelHeight}, format = {softwareBitmap.BitmapPixelFormat}");
         using (IRandomAccessStream stream = await outputFile.OpenAsync(FileAccessMode.ReadWrite))
         {
             // Create an encoder with the desired format
             BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, stream);
+            dbg.Log("Created encoder");
 
             // Set the software bitmap
-            encoder.SetSoftwareBitmap(softwareBitmap);
+            try 
+            {
+                softwareBitmap = SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+                dbg.Log("Converted bitmap");
+                encoder.SetSoftwareBitmap(softwareBitmap);
+                dbg.Log("Set Bitmap");
+            }
+            catch (Exception e)
+            {
+                dbg.Log($"Caught exception trying to convert and set bitmap: '{e.ToString()}'");
+            }
 
             encoder.IsThumbnailGenerated = true;
 
             try
             {
                 await encoder.FlushAsync();
+                dbg.Log("Flushed to encoder");
             }
             catch (Exception err)
             {
@@ -273,15 +277,60 @@ public class AnimationRecorder : MonoBehaviour
 
             if (encoder.IsThumbnailGenerated == false)
             {
-                await encoder.FlushAsync();
-            }
+                try
+                {
+                    await encoder.FlushAsync();
+                    dbg.Log("Flushed to encoder for real");
+                }
+                catch(Exception e)
+                {
+                    dbg.Log($"Could not flush to image: '{e.ToString()}'");
+                }
 
+            }
 
         }
     }
+
+    async void FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
+    {
+        // Don't do anything if no point cloud was captured
+        if (current_animation.Count == 0) 
+            return;
+
+        // Current point cloud already has an image associated with it
+        if (current_animation.GetLast().Bitmap != null)
+            return;
+
+        using (var frame = sender.TryAcquireLatestFrame())
+        {
+            if (frame != null) 
+            {
+                // TODO: see https://github.com/microsoft/psi/blob/cb2651f8e591c63d4a1fc8a16ad08ec7196338eb/Sources/MixedReality/Microsoft.Psi.MixedReality.UniversalWindows/MediaCapture/PhotoVideoCamera.cs#L529
+                // Compute pose
+
+                // TODO: do something with it
+                // Get camera intrinsics
+                var intrinsics = frame.VideoMediaFrame.CameraIntrinsics;
+
+                using (var frameBitmap = frame.VideoMediaFrame.SoftwareBitmap)
+                {
+                    if (frameBitmap == null)
+                    {
+                        dbg.Log("frameBitmap is null!");
+                    }
+                    // Copies bitmap to point cloud
+                    current_animation.GetLast().Bitmap = frameBitmap;
+                }
+
+            }
+        }
+
+    }
 #endif
 
-    public void ToggleRecording()
+
+    public async void ToggleRecording()
     {
         recording = !recording;
         // Write captured point cloud animation to disk
@@ -289,6 +338,17 @@ public class AnimationRecorder : MonoBehaviour
         {
             try
             {
+                // Stop video stream
+#if ENABLE_WINMD_SUPPORT
+                await videoFrameReader.StopAsync();
+                var myPictures = await Windows.Storage.StorageLibrary.GetLibraryAsync(Windows.Storage.KnownLibraryId.Pictures);
+                dbg.Log($"Starting export of {bitmaps.Count} images");
+                for (int i = 0; i < bitmaps.Count; ++i)
+                {
+                    StorageFile file = await myPictures.SaveFolder.CreateFileAsync($"photo_{i}.jpg", CreationCollisionOption.GenerateUniqueName);
+                    SaveSoftwareBitmapToFile((SoftwareBitmap)bitmaps[i], file);
+                }
+#endif
                 dbg.Log(string.Format("Started export of {0} point clouds, frame rate = {1}",
                     current_animation.Count,
                     frames / (DateTime.Now - recordingStart).TotalSeconds));
@@ -296,7 +356,9 @@ public class AnimationRecorder : MonoBehaviour
                 //current_animation.ExportToPLY(DateTime.Now.ToString("dd-MM-yyyyTHH_mm"));
                 // Allocate new PC collection for next animation, freeing memory
                 // for animation that was just written
+
                 current_animation = new PointCloudCollection();
+                dbg.Log($"Photo frame rate = {picture / (DateTime.Now - recordingStart).TotalSeconds}");
             }
             catch (Exception e)
             {
@@ -306,7 +368,19 @@ public class AnimationRecorder : MonoBehaviour
         else
         {
             recordingStart = DateTime.Now;
+#if ENABLE_WINMD_SUPPORT
+            var status = await videoFrameReader.StartAsync();
+            if (status == MediaFrameReaderStartStatus.Success)
+            {
+                dbg.Log("Successfully started mediaframereader!");
+            }
+            else
+            {
+                dbg.Log($"Failed to start mediaframereader!, status = {status}");
+            }
+#endif
             frames = 0;
+            picture = 0;
         }
         // TODO: fix this
 //        else // Start video recording
