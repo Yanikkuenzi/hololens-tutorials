@@ -10,6 +10,7 @@ using UnityEngine.Windows.WebCam;
 using HL2UnityPlugin;
 using Windows.Storage;
 using Windows.Storage.Streams;
+using StreamBuffer = Windows.Storage.Streams.Buffer;
 using Windows.Media.Capture;
 using Windows.Media.Capture.Frames;
 using Windows.Media.MediaProperties;
@@ -17,6 +18,7 @@ using Windows.Graphics.Imaging;
 using System.Runtime.InteropServices;
 using Microsoft.MixedReality.Toolkit.Utilities;
 using Microsoft.MixedReality.Toolkit.Input;
+using System.Runtime.InteropServices.WindowsRuntime;
 #endif
 
 public class AnimationRecorder : MonoBehaviour
@@ -52,7 +54,7 @@ public class AnimationRecorder : MonoBehaviour
 #if ENABLE_WINMD_SUPPORT
     Debug.Log("WINMD SUPPORT enabled");
 #else
-    Debug.Log("WINMD SUPPORT NOT enabled!!!!");
+        Debug.Log("WINMD SUPPORT NOT enabled!!!!");
 #endif 
 
         if (dbg == null)
@@ -70,9 +72,6 @@ public class AnimationRecorder : MonoBehaviour
         InitCamera();
         isCapturing = false;
 #endif
-        // Set up everything for capturing images, giving color to point cloud
-        // See: https://docs.unity3d.com/2019.4/Documentation/ScriptReference/Windows.WebCam.PhotoCapture.html
-
         current_animation = new PointCloudCollection();
 
         recording = false;
@@ -115,7 +114,6 @@ public class AnimationRecorder : MonoBehaviour
                 return;
             }
 
-            DateTime time = DateTime.Now;
             float[] points = researchMode.GetPointCloudBuffer();
             if (points == null)
             {
@@ -125,26 +123,22 @@ public class AnimationRecorder : MonoBehaviour
 
             //dbg.Log(string.Format("{0} points in PointCloudBuffer", points.Length));
 
-            // Capture RGB image
-            //StartCoroutine(CapturePhotoCoroutine());
-            //CapturePhoto();
-
             ++frames;
 
             // TODO: uncomment
-            // Create point cloud and add to animation
-            //PointCloud pointCloud = new PointCloud(points, .5, time);
-            //// Get hand positions for segmentation
-            //MixedRealityPose pose;
-            //if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Wrist, Handedness.Left, out pose))
-            //{
-            //    pointCloud.LeftHandPosition = pose.Position;
-            //}
-            //if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Wrist, Handedness.Right, out pose))
-            //{
-            //    pointCloud.RightHandPosition  = pose.Position;
-            //}
-            //pointCloud.RandomDownSample(2000);
+            //Create point cloud and add to animation
+            PointCloud pointCloud = new PointCloud(points, .5);
+            // Get hand positions for segmentation
+            MixedRealityPose pose;
+            if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Wrist, Handedness.Left, out pose))
+            {
+                pointCloud.LeftHandPosition = pose.Position;
+            }
+            if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Wrist, Handedness.Right, out pose))
+            {
+                pointCloud.RightHandPosition  = pose.Position;
+            }
+            pointCloud.RandomDownSample(2000);
             //if (current_animation == null)
             //{
             //    dbg.Log("current_animation is null");
@@ -165,6 +159,13 @@ public class AnimationRecorder : MonoBehaviour
         try
         {
             var frameSourceGroups = await MediaFrameSourceGroup.FindAllAsync();
+            foreach(var src in frameSourceGroups)
+            {
+                foreach(var info in src.SourceInfos)
+                {
+                    dbg.Log($"There is a source with kind {info.SourceKind}");
+                }
+            }
             var selectedGroupObjects = frameSourceGroups.Select(group =>
                new
                {
@@ -221,6 +222,12 @@ public class AnimationRecorder : MonoBehaviour
             {
                 dbg.Log($"MediaCapture initialization failed: {errorEventArgs.Message}");
             };
+
+            //MediaCapture test = new MediaCapture();
+            //var test_settings = new MediaCaptureInitializationSettings();
+            //await test.InitializeAsync(test_settings);
+            //var colorTest = test.FrameSources[MediaFrameSourceKind.Color];
+            //var depthTest = test.FrameSources[MediaFrameSourceKind.Depth];
 
             videoFrameReader = await mediaCapture.CreateFrameReaderAsync(colorFrameSource);
             videoFrameReader.FrameArrived += FrameArrived;
@@ -295,12 +302,16 @@ public class AnimationRecorder : MonoBehaviour
     async void FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
     {
         // Don't do anything if no point cloud was captured
-        if (current_animation.Count == 0) 
+        if (current_animation.Count == 0) {
+            dbg.Log("No point cloud has been captured yet");
             return;
+        }
 
         // Current point cloud already has an image associated with it
-        if (current_animation.GetLast().Bitmap != null)
+        if (current_animation.GetLast().imageIdx != -1) {
+            dbg.Log("Point cloud already got image");
             return;
+        }
 
         using (var frame = sender.TryAcquireLatestFrame())
         {
@@ -309,9 +320,20 @@ public class AnimationRecorder : MonoBehaviour
                 // TODO: see https://github.com/microsoft/psi/blob/cb2651f8e591c63d4a1fc8a16ad08ec7196338eb/Sources/MixedReality/Microsoft.Psi.MixedReality.UniversalWindows/MediaCapture/PhotoVideoCamera.cs#L529
                 // Compute pose
 
-                // TODO: do something with it
                 // Get camera intrinsics
                 var intrinsics = frame.VideoMediaFrame.CameraIntrinsics;
+
+                // TODO: maybe use CameraIntrinsics instead of matrix
+                // Constrict matrix from it
+                Matrix4x4 projMat = new Matrix4x4();
+                projMat[2,2] = 1;
+                // Focal lengths
+                projMat[0,0] = intrinsics.FocalLength.X;
+                projMat[1,1] = intrinsics.FocalLength.Y;
+                // Principal point
+                projMat[0,2] = intrinsics.PrincipalPoint.X;
+                projMat[1,2] = intrinsics.PrincipalPoint.Y;
+                current_animation.GetLast().cameraMatrix = projMat;
 
                 using (var frameBitmap = frame.VideoMediaFrame.SoftwareBitmap)
                 {
@@ -319,10 +341,14 @@ public class AnimationRecorder : MonoBehaviour
                     {
                         dbg.Log("frameBitmap is null!");
                     }
+                    dbg.Log("Added bitmap to array");
                     // Copies bitmap to point cloud
-                    current_animation.GetLast().Bitmap = frameBitmap;
+                    bitmaps.Add(SoftwareBitmap.Copy(frameBitmap));
+                    current_animation.GetLast().imageIdx = bitmaps.Count - 1;
                 }
 
+            } else {
+                dbg.Log("frame is null");
             }
         }
 
@@ -332,28 +358,62 @@ public class AnimationRecorder : MonoBehaviour
 
     public async void ToggleRecording()
     {
-        recording = !recording;
         // Write captured point cloud animation to disk
-        if (!recording)
+        if (recording)
         {
             try
             {
+                recording = false;
                 // Stop video stream
 #if ENABLE_WINMD_SUPPORT
                 await videoFrameReader.StopAsync();
-                var myPictures = await Windows.Storage.StorageLibrary.GetLibraryAsync(Windows.Storage.KnownLibraryId.Pictures);
-                dbg.Log($"Starting export of {bitmaps.Count} images");
-                for (int i = 0; i < bitmaps.Count; ++i)
+                int nColorless = 0;
+                for (int i = 0; i < current_animation.Count; ++i)
                 {
-                    StorageFile file = await myPictures.SaveFolder.CreateFileAsync($"photo_{i}.jpg", CreationCollisionOption.GenerateUniqueName);
-                    SaveSoftwareBitmapToFile((SoftwareBitmap)bitmaps[i], file);
+                    PointCloud cur = current_animation.Get(i);
+                    if (cur.imageIdx == -1)
+                    {
+                        dbg.Log("Found point cloud without color information!");
+                        ++nColorless;
+                        continue;
+                    }
+
+                    SoftwareBitmap bmp = SoftwareBitmap.Convert((SoftwareBitmap)bitmaps[cur.imageIdx], 
+                                BitmapPixelFormat.Rgba8, BitmapAlphaMode.Straight);
+
+                    Windows.Storage.StorageFolder storageFolder = KnownFolders.Objects3D;
+                    Windows.Storage.StorageFile file =
+                        await storageFolder.CreateFileAsync($"image_{i}.jpg", Windows.Storage.CreationCollisionOption.ReplaceExisting);
+                    SaveSoftwareBitmapToFile(bmp, file);
+
+                    IBuffer buf = new StreamBuffer((uint) (bmp.PixelWidth * bmp.PixelHeight * 4));
+                    dbg.Log($"Before copy: {bmp.PixelWidth}x{bmp.PixelHeight} ==> {buf.Length}");
+                    bmp.CopyToBuffer(buf);
+                    dbg.Log($"After copy: {bmp.PixelWidth}x{bmp.PixelHeight} ==> {buf.Length}");
+                    byte[] bytes = new byte[buf.Length];
+                    dbg.Log($"Length of bytes array: {bytes.Length}");
+                    Texture2D tex = new Texture2D(bmp.PixelWidth, bmp.PixelHeight);
+                    WindowsRuntimeBufferExtensions.CopyTo(buf, bytes);
+                    //tex.LoadRawTextureData(bytes);
+                    // Kind of hacky...
+                    Color[] colors = new Color[bmp.PixelWidth * bmp.PixelHeight];
+                    for (int j = 0; j < bmp.PixelWidth * bmp.PixelHeight; ++j)
+                    {
+                        colors[i] = new Color(bytes[4*i] / 255f, 
+                                              bytes[4*i+1] / 255f, 
+                                              bytes[4*i+2] / 255f, 
+                                              bytes[4*i+3] / 255f);
+                    }
+
+                    tex.Apply();
+                    cur.ColorFromImage(tex);
                 }
+                dbg.Log($"{nColorless} clouds without color!!!1!!!1!");
 #endif
                 dbg.Log(string.Format("Started export of {0} point clouds, frame rate = {1}",
                     current_animation.Count,
                     frames / (DateTime.Now - recordingStart).TotalSeconds));
-                // TODO: uncomment
-                //current_animation.ExportToPLY(DateTime.Now.ToString("dd-MM-yyyyTHH_mm"));
+                current_animation.ExportToPLY(DateTime.Now.ToString("dd-MM-yyyyTHH_mm"));
                 // Allocate new PC collection for next animation, freeing memory
                 // for animation that was just written
 
@@ -379,25 +439,10 @@ public class AnimationRecorder : MonoBehaviour
                 dbg.Log($"Failed to start mediaframereader!, status = {status}");
             }
 #endif
+            recording = true;
             frames = 0;
             picture = 0;
         }
-        // TODO: fix this
-//        else // Start video recording
-//        {
-//            string filename = "recording.mp4";
-//#if ENABLE_WINMD_SUPPORT
-//            StorageFolder objects_3d = KnownFolders.Objects3D;
-//            string filepath = objects_3d.Path + "/" + filename;
-//#else
-//            string filepath = System.IO.Path.Combine(Application.persistentDataPath, filename);
-//#endif
-//            filepath = filepath.Replace("/", @"\");
-//            dbg.Log("Storing video to " + filepath);
-//            // recoring is set to true in the OnStartRecordingVideo function
-//            videoCaptureObject.StartRecordingAsync(filepath, OnStartedRecordingVideo);
-//            dbg.Log("Started recording at " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss,fff"));
-//        }
     }
     private void InitResearchMode()
     {
@@ -419,173 +464,4 @@ public class AnimationRecorder : MonoBehaviour
 #endif
     }
 
-    private void OnApplicationQuit()
-    {
-        dbg.Log("Called OnApplicationQuit");
-
-        // Stop the photo mode and dispose of the photo capture object
-        if (photoCaptureObject == null) 
-        {
-            photoCaptureObject.StopPhotoModeAsync(OnStoppedPhotoMode);
-        }
-#if ENABLE_WINMD_SUPPORT
-        photoCapture.FinishAsync();
-#endif
-        //if (videoCaptureObject != null)
-        //{
-        //    videoCaptureObject.StopVideoModeAsync(OnStoppedVideoCaptureMode);
-        //}
-    }
-
-    void OnDestroy()
-    {
-        dbg.Log("Called OnDestroy");
-
-        // Stop the photo mode and dispose of the photo capture object
-        if (photoCaptureObject == null) 
-        {
-            photoCaptureObject.StopPhotoModeAsync(OnStoppedPhotoMode);
-        }
-#if ENABLE_WINMD_SUPPORT
-        photoCapture.FinishAsync();
-#endif
-        //if (videoCaptureObject != null)
-        //{
-        //    videoCaptureObject.StopVideoModeAsync(OnStoppedVideoCaptureMode);
-        //}
-
-    }
-
-
-
-    // TODO: remove
-
-    // PhotoCapture methods
-    void OnPhotoCaptureCreated(PhotoCapture captureObject)
-    {
-        photoCaptureObject = captureObject;
-
-        // Choose highest available resolution
-        Resolution cameraResolution = PhotoCapture.SupportedResolutions.OrderByDescending((res) => res.width * res.height).First();
-
-        CameraParameters c = new CameraParameters();
-        c.cameraResolutionWidth = cameraResolution.width;
-        c.cameraResolutionHeight = cameraResolution.height;
-        c.pixelFormat = CapturePixelFormat.BGRA32;
-
-        captureObject.StartPhotoModeAsync(c, OnPhotoModeStarted);
-    }
-
-    private void OnPhotoModeStarted(PhotoCapture.PhotoCaptureResult result)
-    {
-        if (!result.success)
-        {
-            dbg.Log("PhotoMode started");
-        }
-        else
-        {
-            Debug.Log(result);
-            dbg.Log("Unable to start photo mode!1!!!1!");
-        }
-    }
-
-    void OnPhotoCaptured(PhotoCapture.PhotoCaptureResult result, PhotoCaptureFrame photoCaptureFrame)
-    {
-        if (result.success)
-        {
-            // Create our Texture2D for use and set the correct resolution
-            //Resolution cameraResolution = PhotoCapture.SupportedResolutions.OrderByDescending((res) => res.width * res.height).First();
-            //Texture2D targetTexture = new Texture2D(cameraResolution.width, cameraResolution.height);
-            // Copy the raw image data into our target texture
-            //photoCaptureFrame.UploadImageDataToTexture(targetTexture);
-            //photoCaptureFrame.
-            ++frames;
-        }
-    }
-
-    void OnStoppedPhotoMode(PhotoCapture.PhotoCaptureResult result)
-    {
-        photoCaptureObject.Dispose();
-        photoCaptureObject = null;
-    }
-
-    void CreateFrameObject(Texture2D frameTexture)
-    {
-        // Create a new Quad GameObject
-        GameObject frameObject = GameObject.CreatePrimitive(PrimitiveType.Quad);
-
-        // Assign the frame texture to the Quad's material
-        frameObject.GetComponent<Renderer>().material.mainTexture = frameTexture;
-
-        // Set the position and scale of the Quad
-        frameObject.transform.position = new Vector3(0, 0, 5);
-        frameObject.transform.localScale = new Vector3(2, 2, 1);
-    }
-
-    //void InitVideoCapture()
-    //{
-    //    try
-    //    {
-    //        VideoCapture.CreateAsync(false, OnVideoCaptureCreated);
-    //    }
-    //    catch (Exception e)
-    //    {
-    //        dbg.Log(e.Message);
-    //    }
-    //}
-
-    //void OnVideoCaptureCreated(VideoCapture videoCapture)
-    //{
-    //    Resolution cameraResolution = VideoCapture.SupportedResolutions.OrderByDescending((res) => res.width * res.height).First();
-    //    dbg.Log("Using resolution: " + cameraResolution);
-
-    //    float cameraFramerate = VideoCapture.GetSupportedFrameRatesForResolution(cameraResolution).OrderByDescending((fps) => fps).First();
-    //    dbg.Log("Using framerate: " + cameraFramerate);
-
-    //    dbg.Log("OnVideoCaptureCreated");
-    //    if (videoCapture != null)
-    //    {
-    //        videoCaptureObject = videoCapture;
-    //        dbg.Log("Created VideoCapture Instance!");
-
-    //        CameraParameters cameraParameters = new CameraParameters();
-    //        cameraParameters.hologramOpacity = 0.0f;
-    //        cameraParameters.frameRate = cameraFramerate;
-    //        cameraParameters.cameraResolutionWidth = cameraResolution.width;
-    //        cameraParameters.cameraResolutionHeight = cameraResolution.height;
-    //        cameraParameters.pixelFormat = CapturePixelFormat.BGRA32;
-
-    //        videoCaptureObject.StartVideoModeAsync(cameraParameters,
-    //            VideoCapture.AudioState.None,
-    //            OnStartedVideoCaptureMode);
-    //    }
-    //    else
-    //    {
-    //        dbg.Log("ERROR: Failed to create VideoCapture Instance!");
-    //    }
-    //}
-
-    //void OnStartedVideoCaptureMode(VideoCapture.VideoCaptureResult result)
-    //{
-    //    dbg.Log("Started Video Capture Mode!");
-    //}
-
-    //void OnStoppedVideoCaptureMode(VideoCapture.VideoCaptureResult result)
-    //{
-    //    dbg.Log("Stopped Video Capture Mode!");
-    //}
-
-    //void OnStartedRecordingVideo(VideoCapture.VideoCaptureResult result)
-    //{
-    //    videoStart = DateTime.Now;
-    //    recording = true;
-    //    dbg.Log("Started Recording Video at " + videoStart.ToString());
-    //}
-
-    //void OnStoppedRecordingVideo(VideoCapture.VideoCaptureResult result)
-    //{
-    //    dbg.Log("Stopped Recording Video!");
-    //}
-
 }
-

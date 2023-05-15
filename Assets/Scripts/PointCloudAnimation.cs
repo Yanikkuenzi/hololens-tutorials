@@ -73,10 +73,44 @@ public class PointCloudAnimation : MonoBehaviour
         if (clouds == null)
         {
             clouds = new PointCloudCollection();
-            clouds.LoadFromPLY("01-05-2023T09_21");
+            clouds.LoadFromPLY("14-05-2023T04_16");
+            Matrix4x4 K = new Matrix4x4();
+            K[0, 0] = 687.6602f;
+            K[1, 1] = 688.903f;
+            K[0, 2] = 442.8347f;
+            K[1, 2] = 238.9398f;
+            K[2, 2] = 1f;
+
+            Debug.Log(K);
+            Texture2D tex = new Texture2D(1,1);
+            byte[] data = File.ReadAllBytes("Assets/Resources/image_0.jpg");
+            tex.LoadImage(data);
+            //RenderTexture(tex);
+            //clouds.GetLast().cameraMatrix = K;
+            //clouds.GetLast().ColorFromImage(tex);
         }
         playing = !playing;
         pointCloudRendererGo.SetActive(playing);
+    }
+
+    public void RenderTexture(Texture2D texture)
+    {
+        GameObject quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+
+        // Set the position of the quad
+        quad.transform.position = new Vector3(0, 0, 0);
+
+        // Get the Renderer component from the quad
+        Renderer quadRenderer = quad.GetComponent<Renderer>();
+
+        // Create a new Material using the Standard shader
+        Material material = new Material(Shader.Find("Standard"));
+
+        // Assign the texture to the material's main texture
+        material.mainTexture = texture;
+
+        // Assign the new material to the quad's renderer
+        quadRenderer.material = material;
     }
 
 }

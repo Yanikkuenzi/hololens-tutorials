@@ -590,7 +590,7 @@ PlayerSettings:
   metroCertificatePassword: 
   metroCertificateSubject: DefaultCompany
   metroCertificateIssuer: DefaultCompany
-  metroCertificateNotAfter: 00f972c7b79cda01
+  metroCertificateNotAfter: 009312fdd7a3da01
   metroApplicationDescription: 4d-holographic-tutorials
   wsaImages: {}
   metroTileShortName: 4d-holographic-tutorials

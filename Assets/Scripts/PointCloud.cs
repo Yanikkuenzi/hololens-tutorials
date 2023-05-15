@@ -13,16 +13,8 @@ public class PointCloud
     private ArrayList points;
     private ArrayList colors;
     private int numberOfPoints;
-#if ENABLE_WINMD_SUPPORT
-    private SoftwareBitmap image;
-
-    public SoftwareBitmap Bitmap
-    {
-        get => image;
-        set { image = SoftwareBitmap.Copy(value); }
-    }
-
-#endif
+    public int imageIdx;
+    public Matrix4x4 cameraMatrix;
 
     public int Count
     {
@@ -59,8 +51,9 @@ public class PointCloud
     /// <param name="distance_threshold"></param>
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public PointCloud(float[] coordinates, double distance_threshold, DateTime timeStamp)
+    public PointCloud(float[] coordinates, double distance_threshold)
     {
+        this.imageIdx = -1;
         if (coordinates == null)
             throw new ArgumentNullException(nameof(coordinates));
         int nPoints = coordinates.Length / 3;
@@ -125,6 +118,13 @@ public class PointCloud
                     (int)(point_color.r * 255), (int)(point_color.g * 255), (int)(point_color.b * 255)));
             }
         }
+
+        using (StreamWriter writer = new StreamWriter(filename.Substring(0, filename.Length - 3) + "txt"))
+        {
+            writer.WriteLine($"{cameraMatrix[0,0]} {cameraMatrix[1,1]} {cameraMatrix[0,2]} {cameraMatrix[1,2]}");
+        }
+
+
     }
 
     /// <summary>
@@ -203,14 +203,14 @@ public class PointCloud
 
 
 
-    public void ColorFromImage(Texture2D texture, Matrix4x4 cameraMatrix)
+    public void ColorFromImage(Texture2D texture)
     {
         // Ignore previous color information
         colors.Clear();
-        //float x_offset = cameraMatrix[0, 2];
-        //float y_offset = cameraMatrix[1, 2];
-        float x_offset = 0;
-        float y_offset = 0;
+        float x_offset = cameraMatrix[0, 2];
+        float y_offset = cameraMatrix[1, 2];
+        //float x_offset = 0;
+        //float y_offset = 0;
 
         foreach (Vector3 point in points)
         {
