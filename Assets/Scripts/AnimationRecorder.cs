@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Windows.WebCam;
@@ -12,6 +13,7 @@ using Windows.Storage;
 using Windows.Storage.Streams;
 using StreamBuffer = Windows.Storage.Streams.Buffer;
 using Windows.Media.Capture;
+using Windows.Perception.Spatial;
 using Windows.Media.Capture.Frames;
 using Windows.Media.MediaProperties;
 using Windows.Graphics.Imaging;
@@ -38,6 +40,7 @@ public class AnimationRecorder : MonoBehaviour
     private DateTime recordingStart;
 
     private bool recording = false;
+    private Thread depthPollingThread = null;
 #if ENABLE_WINMD_SUPPORT
         private MediaCapture mediaCapture;
         private LowLagPhotoCapture photoCapture;
@@ -46,6 +49,7 @@ public class AnimationRecorder : MonoBehaviour
         bool isCapturing;
         Windows.Perception.Spatial.SpatialCoordinateSystem unityWorldOrigin;
         ArrayList bitmaps;
+        ArrayList depthFrames;
 #endif
 
     // Start is called before the first frame update
@@ -69,6 +73,7 @@ public class AnimationRecorder : MonoBehaviour
 
         // Initialize camera
         bitmaps = new ArrayList();
+        depthFrames = new ArrayList();
         InitCamera();
         isCapturing = false;
 #endif
@@ -109,41 +114,31 @@ public class AnimationRecorder : MonoBehaviour
                 }
             }
 
-            if (!researchMode.PointCloudUpdated()) {
-                //dbg.Log("point cloud not updated, returning now");
-                return;
-            }
+            //if (!researchMode.PointCloudUpdated()) {
+            //    //dbg.Log("point cloud not updated, returning now");
+            //    return;
+            //}
 
-            float[] points = researchMode.GetPointCloudBuffer();
-            if (points == null)
-            {
-                dbg.Log("points is null");
-                return;
-            }
+            //float[] points = researchMode.GetPointCloudBuffer();
+            //if (points == null)
+            //{
+            //    dbg.Log("points is null");
+            //    return;
+            //}
 
             //dbg.Log(string.Format("{0} points in PointCloudBuffer", points.Length));
 
-            ++frames;
+            //++frames;
 
-            // TODO: uncomment
-            //Create point cloud and add to animation
-            PointCloud pointCloud = new PointCloud(points, .5);
-            // Get hand positions for segmentation
-            MixedRealityPose pose;
-            if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Wrist, Handedness.Left, out pose))
-            {
-                pointCloud.LeftHandPosition = pose.Position;
-            }
-            if (HandJointUtils.TryGetJointPose(TrackedHandJoint.Wrist, Handedness.Right, out pose))
-            {
-                pointCloud.RightHandPosition  = pose.Position;
-            }
-            pointCloud.RandomDownSample(2000);
+            //// TODO: uncomment
+            ////Create point cloud and add to animation
+            //PointCloud pointCloud = new PointCloud(points, .5);
+            //pointCloud.RandomDownSample(2000);
             //if (current_animation == null)
             //{
             //    dbg.Log("current_animation is null");
             //}
-            current_animation.AddPointCloud(pointCloud);
+            //current_animation.AddPointCloud(pointCloud);
             //dbg.Log("Added pointcloud to animation");
 
         } catch(Exception e)
@@ -240,20 +235,16 @@ public class AnimationRecorder : MonoBehaviour
 
     async void SaveSoftwareBitmapToFile(SoftwareBitmap softwareBitmap, StorageFile outputFile)
     {
-        dbg.Log($"Software bitmap has dimension {softwareBitmap.PixelWidth} x {softwareBitmap.PixelHeight}, format = {softwareBitmap.BitmapPixelFormat}");
         using (IRandomAccessStream stream = await outputFile.OpenAsync(FileAccessMode.ReadWrite))
         {
             // Create an encoder with the desired format
-            BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.JpegEncoderId, stream);
-            dbg.Log("Created encoder");
+            BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
 
             // Set the software bitmap
             try 
             {
                 softwareBitmap = SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
-                dbg.Log("Converted bitmap");
                 encoder.SetSoftwareBitmap(softwareBitmap);
-                dbg.Log("Set Bitmap");
             }
             catch (Exception e)
             {
@@ -265,7 +256,6 @@ public class AnimationRecorder : MonoBehaviour
             try
             {
                 await encoder.FlushAsync();
-                dbg.Log("Flushed to encoder");
             }
             catch (Exception err)
             {
@@ -287,7 +277,6 @@ public class AnimationRecorder : MonoBehaviour
                 try
                 {
                     await encoder.FlushAsync();
-                    dbg.Log("Flushed to encoder for real");
                 }
                 catch(Exception e)
                 {
@@ -301,60 +290,109 @@ public class AnimationRecorder : MonoBehaviour
 
     async void FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
     {
-        // Don't do anything if no point cloud was captured
-        if (current_animation.Count == 0) {
-            dbg.Log("No point cloud has been captured yet");
-            return;
-        }
-
-        // Current point cloud already has an image associated with it
-        if (current_animation.GetLast().imageIdx != -1) {
-            dbg.Log("Point cloud already got image");
-            return;
-        }
-
-        using (var frame = sender.TryAcquireLatestFrame())
+        dbg.Log("Frame arrived");
+        try 
         {
-            if (frame != null) 
+            using (var frame = sender.TryAcquireLatestFrame())
             {
-                // TODO: see https://github.com/microsoft/psi/blob/cb2651f8e591c63d4a1fc8a16ad08ec7196338eb/Sources/MixedReality/Microsoft.Psi.MixedReality.UniversalWindows/MediaCapture/PhotoVideoCamera.cs#L529
-                // Compute pose
-
-                // Get camera intrinsics
-                var intrinsics = frame.VideoMediaFrame.CameraIntrinsics;
-
-                // TODO: maybe use CameraIntrinsics instead of matrix
-                // Constrict matrix from it
-                Matrix4x4 projMat = new Matrix4x4();
-                projMat[2,2] = 1;
-                // Focal lengths
-                projMat[0,0] = intrinsics.FocalLength.X;
-                projMat[1,1] = intrinsics.FocalLength.Y;
-                // Principal point
-                projMat[0,2] = intrinsics.PrincipalPoint.X;
-                projMat[1,2] = intrinsics.PrincipalPoint.Y;
-                current_animation.GetLast().cameraMatrix = projMat;
-
-                using (var frameBitmap = frame.VideoMediaFrame.SoftwareBitmap)
+                if (frame != null) 
                 {
-                    if (frameBitmap == null)
-                    {
-                        dbg.Log("frameBitmap is null!");
-                    }
-                    dbg.Log("Added bitmap to array");
-                    // Copies bitmap to point cloud
-                    bitmaps.Add(SoftwareBitmap.Copy(frameBitmap));
-                    current_animation.GetLast().imageIdx = bitmaps.Count - 1;
-                }
+                    // see https://github.com/microsoft/psi/blob/cb2651f8e591c63d4a1fc8a16ad08ec7196338eb/Sources/MixedReality/Microsoft.Psi.MixedReality.UniversalWindows/MediaCapture/PhotoVideoCamera.cs#L529
 
-            } else {
-                dbg.Log("frame is null");
+                    // Compute pose
+                    SpatialCoordinateSystem extrinsics = frame.CoordinateSystem;
+
+                    // Timestamp
+                    System.TimeSpan? timestamp = frame.SystemRelativeTime;
+
+                    // TODO: Save all of that together with the image to an object and export that to a text file
+
+                    // Get camera intrinsics
+                    var intrinsics = frame.VideoMediaFrame.CameraIntrinsics;
+
+                    // TODO: maybe use CameraIntrinsics instead of matrix
+                    // Constrict matrix from it
+                    Matrix4x4 projMat = new Matrix4x4();
+                    projMat[2,2] = 1;
+                    // Focal lengths
+                    projMat[0,0] = intrinsics.FocalLength.X;
+                    projMat[1,1] = intrinsics.FocalLength.Y;
+                    // Principal point
+                    projMat[0,2] = intrinsics.PrincipalPoint.X;
+                    projMat[1,2] = intrinsics.PrincipalPoint.Y;
+                    //current_animation.GetLast().cameraMatrix = projMat;
+
+                    using (var frameBitmap = frame.VideoMediaFrame.SoftwareBitmap)
+                    {
+                        if (frameBitmap == null)
+                        {
+                            dbg.Log("frameBitmap is null!");
+                        }
+                        // Copies bitmap to point cloud
+                        bitmaps.Add(SoftwareBitmap.Copy(frameBitmap));
+
+
+                    }
+
+                } else {
+                    dbg.Log("frame is null");
+                }
             }
+        }
+        catch(Exception e)
+        {
+            dbg.Log($"Caught exception in FrameArrived: '{e.ToString()}'");
         }
 
     }
-#endif
 
+    //protected void CaptureJointPositions(out ArrayList leftHandPoses, out ArrayList rightHandPoses)
+    //{
+        //// Get hand positions for segmentation
+        //MixedRealityPose pose;
+
+        //foreach (int joint in Enum.GetValues(typeof(TrackedHandJoint)))
+        //{
+        //    if (HandJointUtils.TryGetJointPose(joint, Handedness.Right, out pose))
+        //    {
+        //        rightHandPoses.Add(pose);
+        //    }
+        //    else
+        //    {
+        //        rightHandPoses.Add(null);
+        //    }
+
+        //    if (HandJointUtils.TryGetJointPose(joint, Handedness.Left, out pose))
+        //    {
+        //        leftHandPoses.Add(pose);
+        //    }
+        //    else
+        //    {
+        //        leftHandPoses.Add(null);
+        //    }
+        //}
+
+    //}
+
+#endif
+    private void PollDepthSensor()
+    {
+        while (recording)
+        {
+#if ENABLE_WINMD_SUPPORT
+            if (researchMode.DepthMapTextureUpdated())
+            {
+                dbg.Log("Got new depthmaptexture!");
+                // Append depth frame
+                //ushort[] depthFrame = new ushort[512 * 512];
+                //Array.Copy(researchMode.GetDepthMapBuffer(), depthFrame, 512 * 512);
+                byte[] depthFrame = new byte[512 * 512];
+                Array.Copy(researchMode.GetDepthMapTextureBuffer(), depthFrame, 512 * 512);
+                depthFrames.Add(depthFrame);
+            }
+#endif
+        }
+    }
 
     public async void ToggleRecording()
     {
@@ -364,51 +402,57 @@ public class AnimationRecorder : MonoBehaviour
             try
             {
                 recording = false;
-                // Stop video stream
 #if ENABLE_WINMD_SUPPORT
+                // Stop video stream
                 await videoFrameReader.StopAsync();
-                int nColorless = 0;
-                for (int i = 0; i < current_animation.Count; ++i)
+                // Stop polling depth sensor
+                depthPollingThread.Join();
+                try 
                 {
-                    PointCloud cur = current_animation.Get(i);
-                    if (cur.imageIdx == -1)
-                    {
-                        dbg.Log("Found point cloud without color information!");
-                        ++nColorless;
-                        continue;
-                    }
-
-                    SoftwareBitmap bmp = SoftwareBitmap.Convert((SoftwareBitmap)bitmaps[cur.imageIdx], 
-                                BitmapPixelFormat.Rgba8, BitmapAlphaMode.Straight);
-
                     Windows.Storage.StorageFolder storageFolder = KnownFolders.Objects3D;
-                    Windows.Storage.StorageFile file =
-                        await storageFolder.CreateFileAsync($"image_{i}.jpg", Windows.Storage.CreationCollisionOption.ReplaceExisting);
-                    SaveSoftwareBitmapToFile(bmp, file);
-
-                    IBuffer buf = new StreamBuffer((uint) (bmp.PixelWidth * bmp.PixelHeight * 4));
-                    dbg.Log($"Before copy: {bmp.PixelWidth}x{bmp.PixelHeight} ==> {buf.Length}");
-                    bmp.CopyToBuffer(buf);
-                    dbg.Log($"After copy: {bmp.PixelWidth}x{bmp.PixelHeight} ==> {buf.Length}");
-                    byte[] bytes = new byte[buf.Length];
-                    dbg.Log($"Length of bytes array: {bytes.Length}");
-                    Texture2D tex = new Texture2D(bmp.PixelWidth, bmp.PixelHeight);
-                    WindowsRuntimeBufferExtensions.CopyTo(buf, bytes);
-                    //tex.LoadRawTextureData(bytes);
-                    // Kind of hacky...
-                    Color[] colors = new Color[bmp.PixelWidth * bmp.PixelHeight];
-                    for (int j = 0; j < bmp.PixelWidth * bmp.PixelHeight; ++j)
+                    for (int i = 0; i < bitmaps.Count; ++i)
                     {
-                        colors[i] = new Color(bytes[4*i] / 255f, 
-                                              bytes[4*i+1] / 255f, 
-                                              bytes[4*i+2] / 255f, 
-                                              bytes[4*i+3] / 255f);
+                        SoftwareBitmap bmp = SoftwareBitmap.Convert((SoftwareBitmap)bitmaps[i], 
+                                    BitmapPixelFormat.Rgba8, BitmapAlphaMode.Straight);
+
+                        Windows.Storage.StorageFile file =
+                            await (await storageFolder.GetFolderAsync("rgb")).CreateFileAsync($"{i:D6}.png", Windows.Storage.CreationCollisionOption.ReplaceExisting);
+                        SaveSoftwareBitmapToFile(bmp, file);
+
+                        dbg.Log($"Processed rgb frame {i+1} of {bitmaps.Count}, number of depth images is {depthFrames.Count}");
                     }
 
-                    tex.Apply();
-                    cur.ColorFromImage(tex);
+
+                    for (int i = 0; i < depthFrames.Count; ++i)
+                    {
+                        Texture2D depthTexture = new Texture2D(512, 512);
+                        //ushort[] depths = (ushort[])depthFrames[i];
+                        byte[] depths = (byte[])depthFrames[i];
+
+                        // TODO: fix this
+                        for(int row = 0; row < 512; ++row)
+                        {
+                            for(int col = 0; col < 512; ++col)
+                            {
+                                
+                                //ushort val = depths[512 * row + col];
+                                //float intensity =  val > 4090 ? 0f : val / 4090f;
+                                byte val = depths[512 * row + col];
+                                float intensity =  val / 255f;
+                                depthTexture.SetPixel(row, col, new Color(intensity, intensity, intensity));
+                            }
+                        }
+
+                        byte[] bytes = ImageConversion.EncodeToPNG(depthTexture);
+                        File.WriteAllBytes($"{storageFolder.Path}/depth/{i:D6}.png", bytes);
+
+                        dbg.Log($"Processed depth frame {i+1}");
+                    }
                 }
-                dbg.Log($"{nColorless} clouds without color!!!1!!!1!");
+                catch(Exception e)
+                {
+                    dbg.Log($"Error while saving images: '{e.ToString()}'");
+                }
 #endif
                 dbg.Log(string.Format("Started export of {0} point clouds, frame rate = {1}",
                     current_animation.Count,
@@ -427,8 +471,12 @@ public class AnimationRecorder : MonoBehaviour
         }
         else
         {
+            recording = true;
             recordingStart = DateTime.Now;
+            depthPollingThread = new Thread(new ThreadStart(PollDepthSensor));
+            depthPollingThread.Start();
 #if ENABLE_WINMD_SUPPORT
+
             var status = await videoFrameReader.StartAsync();
             if (status == MediaFrameReaderStartStatus.Success)
             {
@@ -439,11 +487,11 @@ public class AnimationRecorder : MonoBehaviour
                 dbg.Log($"Failed to start mediaframereader!, status = {status}");
             }
 #endif
-            recording = true;
             frames = 0;
             picture = 0;
         }
     }
+
     private void InitResearchMode()
     {
 #if ENABLE_WINMD_SUPPORT

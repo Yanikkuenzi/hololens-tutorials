@@ -83,11 +83,14 @@ public class PointCloudAnimation : MonoBehaviour
 
             Debug.Log(K);
             Texture2D tex = new Texture2D(1,1);
-            byte[] data = File.ReadAllBytes("Assets/Resources/image_0.jpg");
+            byte[] data = File.ReadAllBytes("Assets/Resources/image_1.jpg");
             tex.LoadImage(data);
             //RenderTexture(tex);
-            //clouds.GetLast().cameraMatrix = K;
-            //clouds.GetLast().ColorFromImage(tex);
+            clouds.GetLast().cameraMatrix = K;
+            clouds.GetLast().ColorFromImage(tex);
+            clouds.GetLast().Colors[12] = Color.red;
+            clouds.GetLast().Colors[100] = Color.green;
+            clouds.GetLast().Colors[1000] = Color.blue;
         }
         playing = !playing;
         pointCloudRendererGo.SetActive(playing);
