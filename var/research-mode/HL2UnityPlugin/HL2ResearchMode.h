@@ -21,6 +21,8 @@ namespace winrt::HL2UnityPlugin::implementation
     struct HL2ResearchMode : HL2ResearchModeT<HL2ResearchMode>
     {
         HL2ResearchMode();
+        static HRESULT CheckCamConsent();
+        static HRESULT CheckImuConsent();
 
         UINT16 GetCenterDepth();
         int GetDepthBufferSize();
@@ -32,6 +34,7 @@ namespace winrt::HL2UnityPlugin::implementation
 		hstring PrintRFResolution();
 		hstring PrintRFExtrinsics();
 
+        com_array<float> GetLUTEntries(array_view<const float> uv);
         void InitializeDepthSensor();
         void InitializeLongDepthSensor();
         void InitializeSpatialCamerasFront();
@@ -65,7 +68,7 @@ namespace winrt::HL2UnityPlugin::implementation
         void SetPointCloudDepthOffset(uint16_t offset);
 
         com_array<uint16_t> GetDepthMapBuffer();
-        com_array<uint8_t> GetDepthMapTextureBuffer();
+        com_array<uint8_t> GetDepthMapTextureBuffer(int64_t& ts);
         com_array<uint16_t> GetShortAbImageBuffer();
         com_array<uint8_t> GetShortAbImageTextureBuffer();
         com_array<uint16_t> GetLongAbImageBuffer();
@@ -90,6 +93,7 @@ namespace winrt::HL2UnityPlugin::implementation
         int m_pointcloudLength = 0;
         float* m_longThrowPointCloud = nullptr;
         int m_longThrowPointcloudLength = 0;
+		UINT64 lastTs = 0;
         UINT16* m_depthMap = nullptr;
         UINT8* m_depthMapTexture = nullptr;
         UINT16* m_shortAbImage = nullptr;

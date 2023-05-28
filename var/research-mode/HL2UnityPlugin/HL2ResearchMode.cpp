@@ -64,6 +64,86 @@ namespace winrt::HL2UnityPlugin::implementation
         winrt::check_hresult(m_pSensorDevice->GetSensorDescriptors(m_sensorDescriptors.data(), m_sensorDescriptors.size(), &sensorCount));
     }
 
+    HRESULT HL2ResearchMode::CheckCamConsent()
+    {
+        HRESULT hr = S_OK;
+        DWORD waitResult = WaitForSingleObject(camConsentGiven, INFINITE);
+        if (waitResult == WAIT_OBJECT_0)
+        {
+            switch (camAccessCheck)
+            {
+            case ResearchModeSensorConsent::Allowed:
+                OutputDebugString(L"Access is granted");
+                break;
+            case ResearchModeSensorConsent::DeniedBySystem:
+                OutputDebugString(L"Access is denied by the system");
+                hr = E_ACCESSDENIED;
+                break;
+            case ResearchModeSensorConsent::DeniedByUser:
+                OutputDebugString(L"Access is denied by the user");
+                hr = E_ACCESSDENIED;
+                break;
+            case ResearchModeSensorConsent::NotDeclaredByApp:
+                OutputDebugString(L"Capability is not declared in the app manifest");
+                hr = E_ACCESSDENIED;
+                break;
+            case ResearchModeSensorConsent::UserPromptRequired:
+                OutputDebugString(L"Capability user prompt required");
+                hr = E_ACCESSDENIED;
+                break;
+            default:
+                OutputDebugString(L"Access is denied by the system");
+                hr = E_ACCESSDENIED;
+                break;
+            }
+        }
+        else
+        {
+            hr = E_UNEXPECTED;
+        }
+        return hr;
+    }
+
+    HRESULT HL2ResearchMode::CheckImuConsent()
+    {
+        HRESULT hr = S_OK;
+        DWORD waitResult = WaitForSingleObject(imuConsentGiven, INFINITE);
+        if (waitResult == WAIT_OBJECT_0)
+        {
+            switch (imuAccessCheck)
+            {
+            case ResearchModeSensorConsent::Allowed:
+                OutputDebugString(L"Access is granted");
+                break;
+            case ResearchModeSensorConsent::DeniedBySystem:
+                OutputDebugString(L"Access is denied by the system");
+                hr = E_ACCESSDENIED;
+                break;
+            case ResearchModeSensorConsent::DeniedByUser:
+                OutputDebugString(L"Access is denied by the user");
+                hr = E_ACCESSDENIED;
+                break;
+            case ResearchModeSensorConsent::NotDeclaredByApp:
+                OutputDebugString(L"Capability is not declared in the app manifest");
+                hr = E_ACCESSDENIED;
+                break;
+            case ResearchModeSensorConsent::UserPromptRequired:
+                OutputDebugString(L"Capability user prompt required");
+                hr = E_ACCESSDENIED;
+                break;
+            default:
+                OutputDebugString(L"Access is denied by the system");
+                hr = E_ACCESSDENIED;
+                break;
+            }
+        }
+        else
+        {
+            hr = E_UNEXPECTED;
+        }
+        return hr;
+    }
+
     void HL2ResearchMode::InitializeDepthSensor() 
     {
         for (auto sensorDescriptor : m_sensorDescriptors)
@@ -157,7 +237,7 @@ namespace winrt::HL2UnityPlugin::implementation
         }
         m_reconstructShortThrowPointCloud = reconstructPointCloud;
 
-        m_pDepthUpdateThread = new std::thread(HL2ResearchMode::DepthSensorLoop, this);
+        if (SUCCEEDED(CheckCamConsent())) m_pDepthUpdateThread = new std::thread(HL2ResearchMode::DepthSensorLoop, this);
     }
 
     void HL2ResearchMode::DepthSensorLoop(HL2ResearchMode* pHL2ResearchMode)
@@ -173,12 +253,20 @@ namespace winrt::HL2UnityPlugin::implementation
 
         try 
         {
-            UINT64 lastTs = 0;
             while (pHL2ResearchMode->m_depthSensorLoopStarted)
             {
                 IResearchModeSensorFrame* pDepthSensorFrame = nullptr;
                 ResearchModeSensorResolution resolution;
                 pHL2ResearchMode->m_depthSensor->GetNextBuffer(&pDepthSensorFrame);
+
+                ResearchModeSensorTimestamp timestamp;
+                pDepthSensorFrame->GetTimeStamp(&timestamp);
+
+                if (timestamp.HostTicks == pHL2ResearchMode->lastTs) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));    // sleep for 0.01 second
+                    continue;
+                }
+                pHL2ResearchMode->lastTs = timestamp.HostTicks;
 
                 // process sensor frame
                 pDepthSensorFrame->GetResolution(&resolution);
@@ -198,12 +286,6 @@ namespace winrt::HL2UnityPlugin::implementation
                 auto pDepthTexture = std::make_unique<uint8_t[]>(outBufferCount);
                 auto pAbTexture = std::make_unique<uint8_t[]>(outAbBufferCount);
                 std::vector<float> pointCloud;
-
-                ResearchModeSensorTimestamp timestamp;
-                pDepthSensorFrame->GetTimeStamp(&timestamp);
-
-                if (timestamp.HostTicks == lastTs) continue;
-                lastTs = timestamp.HostTicks;
 
                 // get tracking transform
                 Windows::Perception::Spatial::SpatialLocation transToWorld = nullptr;
@@ -372,7 +454,7 @@ namespace winrt::HL2UnityPlugin::implementation
         }
         m_reconstructLongThrowPointCloud = reconstructPointCloud;
 
-        m_pLongDepthUpdateThread = new std::thread(HL2ResearchMode::LongDepthSensorLoop, this);
+        if (SUCCEEDED(CheckCamConsent())) m_pLongDepthUpdateThread = new std::thread(HL2ResearchMode::LongDepthSensorLoop, this);
     }
 
     void HL2ResearchMode::LongDepthSensorLoop(HL2ResearchMode* pHL2ResearchMode)
@@ -397,6 +479,15 @@ namespace winrt::HL2UnityPlugin::implementation
                 ResearchModeSensorResolution resolution;
                 pHL2ResearchMode->m_longDepthSensor->GetNextBuffer(&pDepthSensorFrame);
 
+                ResearchModeSensorTimestamp timestamp;
+                pDepthSensorFrame->GetTimeStamp(&timestamp);
+
+                if (timestamp.HostTicks == lastTs) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));    // sleep for 0.01 second
+                    continue;
+                }
+                lastTs = timestamp.HostTicks;
+
                 // process sensor frame
                 pDepthSensorFrame->GetResolution(&resolution);
                 pHL2ResearchMode->m_longDepthResolution = resolution;
@@ -418,12 +509,6 @@ namespace winrt::HL2UnityPlugin::implementation
                 auto pDepthTexture = std::make_unique<uint8_t[]>(outBufferCount);
                 auto pAbTexture = std::make_unique<uint8_t[]>(outBufferCount);
                 std::vector<float> pointCloud;
-
-                ResearchModeSensorTimestamp timestamp;
-                pDepthSensorFrame->GetTimeStamp(&timestamp);
-
-                if (timestamp.HostTicks == lastTs) continue;
-                lastTs = timestamp.HostTicks;
 
                 // get tracking transform
                 Windows::Perception::Spatial::SpatialLocation transToWorld = nullptr;
@@ -497,7 +582,7 @@ namespace winrt::HL2UnityPlugin::implementation
                             && pointCloud.size() >= 3)
                         {
                             pHL2ResearchMode->m_centerDepth = depth;
-                            if (depth > pHL2ResearchMode->depthCamRoi.depthNearClip && depth < pHL2ResearchMode->depthCamRoi.depthFarClip)
+                            if (depth > 200)
                             {
                                 std::lock_guard<std::mutex> l(pHL2ResearchMode->mu);
                                 pHL2ResearchMode->m_centerPoint[0] = *(pointCloud.end() - 3);
@@ -588,7 +673,7 @@ namespace winrt::HL2UnityPlugin::implementation
             m_refFrame = m_locator.GetDefault().CreateStationaryFrameOfReferenceAtCurrentLocation().CoordinateSystem();
         }
 
-        m_pSpatialCamerasFrontUpdateThread = new std::thread(HL2ResearchMode::SpatialCamerasFrontLoop, this);
+        if (SUCCEEDED(CheckCamConsent())) m_pSpatialCamerasFrontUpdateThread = new std::thread(HL2ResearchMode::SpatialCamerasFrontLoop, this);
     }
 
     void HL2ResearchMode::SpatialCamerasFrontLoop(HL2ResearchMode* pHL2ResearchMode)
@@ -708,7 +793,7 @@ namespace winrt::HL2UnityPlugin::implementation
 
     void HL2ResearchMode::StartAccelSensorLoop()
     {
-        m_pAccelUpdateThread = new std::thread(HL2ResearchMode::AccelSensorLoop, this);
+        if (SUCCEEDED(CheckImuConsent())) m_pAccelUpdateThread = new std::thread(HL2ResearchMode::AccelSensorLoop, this);
     }
 
     void HL2ResearchMode::AccelSensorLoop(HL2ResearchMode* pHL2ResearchMode)
@@ -778,7 +863,7 @@ namespace winrt::HL2UnityPlugin::implementation
 
     void HL2ResearchMode::StartGyroSensorLoop()
     {
-        m_pGyroUpdateThread = new std::thread(HL2ResearchMode::GyroSensorLoop, this);
+        if (SUCCEEDED(CheckImuConsent())) m_pGyroUpdateThread = new std::thread(HL2ResearchMode::GyroSensorLoop, this);
     }
 
     void HL2ResearchMode::GyroSensorLoop(HL2ResearchMode* pHL2ResearchMode)
@@ -847,7 +932,7 @@ namespace winrt::HL2UnityPlugin::implementation
 
     void HL2ResearchMode::StartMagSensorLoop()
     {
-        m_pMagUpdateThread = new std::thread(HL2ResearchMode::MagSensorLoop, this);
+        if (SUCCEEDED(CheckImuConsent())) m_pMagUpdateThread = new std::thread(HL2ResearchMode::MagSensorLoop, this);
     }
 
     void HL2ResearchMode::MagSensorLoop(HL2ResearchMode* pHL2ResearchMode)
@@ -1132,7 +1217,7 @@ namespace winrt::HL2UnityPlugin::implementation
     }
 
     // Get depth map texture buffer. (For visualization purpose)
-    com_array<uint8_t> HL2ResearchMode::GetDepthMapTextureBuffer()
+    com_array<uint8_t> HL2ResearchMode::GetDepthMapTextureBuffer(int64_t& ts)
     {
         std::lock_guard<std::mutex> l(mu);
         if (!m_depthMapTexture) 
@@ -1140,6 +1225,8 @@ namespace winrt::HL2UnityPlugin::implementation
             return com_array<UINT8>();
         }
         com_array<UINT8> tempBuffer = com_array<UINT8>(std::move_iterator(m_depthMapTexture), std::move_iterator(m_depthMapTexture + m_depthBufferSize));
+
+        ts = lastTs;
 
         m_depthMapTextureUpdated = false;
         return tempBuffer;
@@ -1386,6 +1473,20 @@ namespace winrt::HL2UnityPlugin::implementation
         auto pos = location.Position();
         auto posMat = XMMatrixTranslation(pos.x, pos.y, pos.z);
         return rotMat * posMat;
+    }
+
+    com_array<float> HL2ResearchMode::GetLUTEntries(array_view<const float> uv) {
+        std::lock_guard<std::mutex> l(mu);
+        com_array<float> result(uv.size());
+        float xy[2] = { 0 };
+        for (int i = 0; i < uv.size(); i+=2) {
+            float point[2] = { uv[i], uv[i + 1] };
+            ((IResearchModeCameraSensor*)m_depthSensor)->MapCameraSpaceToImagePoint(point, xy);
+            result[i] = xy[0];
+            result[i+1] = xy[1];
+        }
+        result[0] = 42;
+        return result;
     }
 
 }

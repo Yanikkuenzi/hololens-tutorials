@@ -4,9 +4,11 @@ namespace HL2UnityPlugin
     {
         HL2ResearchMode();
 
+        Single[] GetLUTEntries(Single[] uv);
+
         UInt16 GetCenterDepth();
         UInt16[] GetDepthMapBuffer();
-        UInt8[] GetDepthMapTextureBuffer();
+        UInt8[] GetDepthMapTextureBuffer(out Int64 ts);
         UInt16[] GetShortAbImageBuffer();
         UInt8[] GetShortAbImageTextureBuffer();
         UInt16[] GetLongAbImageBuffer();

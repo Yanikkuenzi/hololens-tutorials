@@ -31,7 +31,6 @@ public class AnimationRecorder : MonoBehaviour
     private PointCloudCollection current_animation;
 
     private PhotoCapture photoCaptureObject = null;
-    //private VideoCapture videoCaptureObject = null;
     // TODO: remove
     int frames;
     int picture = 0;
@@ -50,6 +49,7 @@ public class AnimationRecorder : MonoBehaviour
         Windows.Perception.Spatial.SpatialCoordinateSystem unityWorldOrigin;
         ArrayList bitmaps;
         ArrayList depthFrames;
+        ArrayList mappings;
 #endif
 
     // Start is called before the first frame update
@@ -74,6 +74,7 @@ public class AnimationRecorder : MonoBehaviour
         // Initialize camera
         bitmaps = new ArrayList();
         depthFrames = new ArrayList();
+        mappings = new ArrayList();
         InitCamera();
         isCapturing = false;
 #endif
@@ -377,18 +378,27 @@ public class AnimationRecorder : MonoBehaviour
 #endif
     private void PollDepthSensor()
     {
+        long timeStamp = 0;
+        System.Random rand = new System.Random(0);
+        float[] samplePoints = new float[20];
+        for (int i = 0; i < 20; ++i)
+        {
+            samplePoints[i] = (float) (rand.NextDouble() * 512);
+        }
         while (recording)
         {
 #if ENABLE_WINMD_SUPPORT
             if (researchMode.DepthMapTextureUpdated())
             {
-                dbg.Log("Got new depthmaptexture!");
                 // Append depth frame
                 //ushort[] depthFrame = new ushort[512 * 512];
                 //Array.Copy(researchMode.GetDepthMapBuffer(), depthFrame, 512 * 512);
                 byte[] depthFrame = new byte[512 * 512];
-                Array.Copy(researchMode.GetDepthMapTextureBuffer(), depthFrame, 512 * 512);
-                depthFrames.Add(depthFrame);
+                Array.Copy(researchMode.GetDepthMapTextureBuffer(out timeStamp), depthFrame, 512 * 512);
+                dbg.Log($"Got new depthmaptexture with timestamp {timeStamp}!");
+                float[] xy = researchMode.GetLUTEntries(samplePoints);
+                mappings.Add((samplePoints, xy));
+                depthFrames.Add(new Frame<byte>(timeStamp, depthFrame));
             }
 #endif
         }
@@ -427,7 +437,8 @@ public class AnimationRecorder : MonoBehaviour
                     {
                         Texture2D depthTexture = new Texture2D(512, 512);
                         //ushort[] depths = (ushort[])depthFrames[i];
-                        byte[] depths = (byte[])depthFrames[i];
+                        Frame<byte> frame = (Frame<byte>)depthFrames[i];
+                        byte[] depths = frame.data;
 
                         // TODO: fix this
                         for(int row = 0; row < 512; ++row)
@@ -437,7 +448,7 @@ public class AnimationRecorder : MonoBehaviour
                                 
                                 //ushort val = depths[512 * row + col];
                                 //float intensity =  val > 4090 ? 0f : val / 4090f;
-                                byte val = depths[512 * row + col];
+                                byte val = depths[512 * col + row];
                                 float intensity =  val / 255f;
                                 depthTexture.SetPixel(row, col, new Color(intensity, intensity, intensity));
                             }
@@ -447,6 +458,17 @@ public class AnimationRecorder : MonoBehaviour
                         File.WriteAllBytes($"{storageFolder.Path}/depth/{i:D6}.png", bytes);
 
                         dbg.Log($"Processed depth frame {i+1}");
+                    }
+                    var map = (ValueTuple<float[], float[]>)(mappings[0]);
+                    float[] uv = map.Item1;
+                    float[] xy = map.Item2;
+
+                    using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/mapping.txt"))
+                    {
+                        for(int i = 0; i < xy.Length; i += 2) 
+                        {
+                            writer.WriteLine($"({xy[i]}, {xy[i+1]}) maps to ({uv[i]}, {uv[i+1]})");
+                        }
                     }
                 }
                 catch(Exception e)

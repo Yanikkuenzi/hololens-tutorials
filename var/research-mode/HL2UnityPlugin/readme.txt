@@ -21,5 +21,3 @@ Steps:
 Learn more about C++/WinRT here:
 http://aka.ms/cppwinrt/
 ========================================================================
-
-Code is based on work by https://github.com/petergu684/HoloLens2-ResearchMode-Unity
