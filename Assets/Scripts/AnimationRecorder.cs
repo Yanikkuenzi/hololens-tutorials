@@ -33,8 +33,6 @@ public class AnimationRecorder : MonoBehaviour
     private PointCloudCollection current_animation;
 
     private PhotoCapture photoCaptureObject = null;
-    // TODO: remove
-    int frames;
     int picture = 0;
     private Texture2D targetTexture = null;
     private CameraParameters cameraParameters;
@@ -296,8 +294,6 @@ public class AnimationRecorder : MonoBehaviour
                     // Timestamp
                     long ticks = frame.SystemRelativeTime is TimeSpan s ? s.Ticks : -1;
 
-                    // TODO: Save all of that together with the image to an object and export that to a text file
-
                     // Get camera intrinsics
                     var intrinsics = frame.VideoMediaFrame.CameraIntrinsics;
 
@@ -379,9 +375,6 @@ public class AnimationRecorder : MonoBehaviour
             if (researchMode.DepthMapTextureUpdated())
             {
                 // Append depth frame
-
-                //byte[] depthFrame = new byte[512 * 512];
-                //Array.Copy(researchMode.GetDepthMapTextureBuffer(out timeStamp), depthFrame, 512 * 512);
                 ushort[] depthFrame = new ushort[512 * 512];
                 Array.Copy(researchMode.GetDepthMapBuffer(out timeStamp), depthFrame, 512 * 512);
                 dbg.Log($"Got new depthmaptexture with timestamp {timeStamp}!");
@@ -390,7 +383,6 @@ public class AnimationRecorder : MonoBehaviour
                 frame.uv = samplePoints;
                 frame.extrinsics = System.Numerics.Matrix4x4.Identity;
                 float[] M = researchMode.GetDepthToWorld();
-
                 System.Numerics.Matrix4x4 ext = new System.Numerics.Matrix4x4();
 
                 // This is ridiculous but apparently indexing a matrix by row/col is not supported :(
@@ -412,6 +404,9 @@ public class AnimationRecorder : MonoBehaviour
                 ext.M44 = M[15];
 
                 frame.extrinsics = ext;
+
+                //frame.pc = new PointCloud(researchMode.GetPointCloudBuffer());
+
                 depthFrames.Add(frame);
             }
 #endif
@@ -431,6 +426,7 @@ public class AnimationRecorder : MonoBehaviour
                 depthPollingThread.Join();
                 // Stop video stream
                 await videoFrameReader.StopAsync();
+                var recordingEnd = DateTime.Now;
                 try 
                 {
                     Windows.Storage.StorageFolder storageFolder = KnownFolders.Objects3D;
@@ -485,8 +481,6 @@ public class AnimationRecorder : MonoBehaviour
                         ushort[] depths = frame.data;
 
                         var pixels = new Color32[512*512];
-                        // TODO: remove
-                        depths[0] = 4090;
                         for(int row = 0; row < 512; ++row)
                         {
                             for(int col = 0; col < 512; ++col)
@@ -523,24 +517,30 @@ public class AnimationRecorder : MonoBehaviour
                                 writer.WriteLine($"{frame.xy[j]}, {frame.xy[j+1]}, {frame.uv[j]}, {frame.uv[j+1]}");
                             }
                         }
-
+                        //frame.pc.Build();
+                        //frame.pc.ExportToPLY($"{storageFolder.Path}/depth/PointCloud_{i:D6}.ply");
                         dbg.Log($"Processed depth frame {i+1}, max depth = {max}; new!");
                     }
+                    double seconds = (recordingEnd - recordingStart).TotalSeconds;
+                    dbg.Log($"Done processing! Depth frame rate = {depthFrames.Count / seconds}, RGB frame rate = {colorFrames.Count / seconds}");
+
+                    // Reset frames
+                    colorFrames = new ArrayList();
+                    depthFrames = new ArrayList();
                 }
                 catch(Exception e)
                 {
                     dbg.Log($"Error while saving images: '{e.ToString()}'");
                 }
 #endif
-                dbg.Log(string.Format("Started export of {0} point clouds, frame rate = {1}",
-                    current_animation.Count,
-                    frames / (DateTime.Now - recordingStart).TotalSeconds));
-                current_animation.ExportToPLY(DateTime.Now.ToString("dd-MM-yyyyTHH_mm"));
+                //dbg.Log(string.Format("Started export of {0} point clouds, frame rate = {1}",
+                //    current_animation.Count,
+                //    frames / (DateTime.Now - recordingStart).TotalSeconds));
+                //current_animation.ExportToPLY(DateTime.Now.ToString("dd-MM-yyyyTHH_mm"));
                 // Allocate new PC collection for next animation, freeing memory
                 // for animation that was just written
 
                 current_animation = new PointCloudCollection();
-                dbg.Log($"Photo frame rate = {picture / (DateTime.Now - recordingStart).TotalSeconds}");
             }
             catch (Exception e)
             {
@@ -567,7 +567,6 @@ public class AnimationRecorder : MonoBehaviour
             // Start depth capture
             depthPollingThread = new Thread(new ThreadStart(PollDepthSensor));
             depthPollingThread.Start();
-            frames = 0;
             picture = 0;
         }
     }
@@ -583,7 +582,8 @@ public class AnimationRecorder : MonoBehaviour
             researchMode.SetReferenceCoordinateSystem(unityWorldOrigin);
             researchMode.SetPointCloudDepthOffset(0);
 
-            researchMode.StartDepthSensorLoop(false);
+            //researchMode.StartDepthSensorLoop(false);
+            researchMode.StartDepthSensorLoop(true);
             //researchMode.StartSpatialCamerasFrontLoop();
             dbg.Log("Initialized research mode");
         } catch (Exception e) {

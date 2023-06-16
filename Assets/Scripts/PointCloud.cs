@@ -13,8 +13,8 @@ public class PointCloud
     private ArrayList points;
     private ArrayList colors;
     private int numberOfPoints;
-    public int imageIdx;
     public Matrix4x4 cameraMatrix;
+    private float[] coordinates;
 
     public int Count
     {
@@ -51,18 +51,32 @@ public class PointCloud
     /// <param name="distance_threshold"></param>
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public PointCloud(float[] coordinates, double distance_threshold)
+    public PointCloud(float[] coordinates, bool build_now = false) //, double distance_threshold)
     {
-        this.imageIdx = -1;
         if (coordinates == null)
             throw new ArgumentNullException(nameof(coordinates));
-        int nPoints = coordinates.Length / 3;
-        if (nPoints == 0)
+        if (coordinates.Length % 3 != 0)
+            throw new ArgumentException("Length of coordinates must be divisible by 3");
+        if (coordinates.Length == 0)
             throw new ArgumentOutOfRangeException("Point cloud must contain at least one point");
 
+        if (!build_now)
+        {
+            this.coordinates = new float[coordinates.Length];
+            Array.Copy(coordinates, this.coordinates, coordinates.Length);
+        } 
+        else
+        {
+            Build(coordinates);
+        }
+    }
+
+    public void Build(float[] coordinates)
+    {
+        int nPoints = coordinates.Length / 3;
         // Square distance threshold to compare it to squared magnitude later,
         // saves some square root computations
-        distance_threshold *= distance_threshold;
+        //distance_threshold *= distance_threshold;
 
         // Reserve enough space to avoid copy operations
         points = new ArrayList(nPoints);
@@ -74,8 +88,8 @@ public class PointCloud
             Vector3 point = new Vector3(coordinates[3 * i], coordinates[3 * i + 1], coordinates[3 * i + 2]);
 
             // Filter out far points
-            if (point.sqrMagnitude > distance_threshold)
-                continue;
+            //if (point.sqrMagnitude > distance_threshold)
+            //    continue;
 
             points.Add(point);
             // TODO: change 
@@ -83,6 +97,11 @@ public class PointCloud
         }
         // All of the inserted elements are valid
         numberOfPoints = points.Count;
+    }
+
+    public void Build()
+    {
+        Build(this.coordinates);
     }
 
     public PointCloud(string filename)
@@ -119,10 +138,10 @@ public class PointCloud
             }
         }
 
-        using (StreamWriter writer = new StreamWriter(filename.Substring(0, filename.Length - 3) + "txt"))
-        {
-            writer.WriteLine($"{cameraMatrix[0,0]} {cameraMatrix[1,1]} {cameraMatrix[0,2]} {cameraMatrix[1,2]}");
-        }
+        //using (StreamWriter writer = new StreamWriter(filename.Substring(0, filename.Length - 3) + "txt"))
+        //{
+        //    writer.WriteLine($"{cameraMatrix[0,0]} {cameraMatrix[1,1]} {cameraMatrix[0,2]} {cameraMatrix[1,2]}");
+        //}
 
 
     }

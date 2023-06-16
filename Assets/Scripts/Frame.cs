@@ -21,6 +21,8 @@ public class DepthFrame : Frame
     public float[] uv { get; set; }
     public float[] xy { get; set; }
 
+    public PointCloud pc;
+
     public DepthFrame(long ts, ushort[] data)
         : base(ts)
     {
