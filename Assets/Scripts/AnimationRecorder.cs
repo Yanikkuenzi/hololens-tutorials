@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -8,6 +9,8 @@ using UnityEngine;
 using UnityEngine.Windows.WebCam;
 using System.Numerics;
 using UnityEngine.Experimental.Rendering;
+using MathNet.Spatial.Euclidean;
+using MathNet.Numerics.LinearAlgebra;
 
 #if ENABLE_WINMD_SUPPORT
 using HL2UnityPlugin;
@@ -49,6 +52,7 @@ public class AnimationRecorder : MonoBehaviour
         Windows.Perception.Spatial.SpatialCoordinateSystem unityWorldOrigin;
         ArrayList colorFrames;
         ArrayList depthFrames;
+        float[] mappings;
 #endif
 
     // Start is called before the first frame update
@@ -316,6 +320,7 @@ public class AnimationRecorder : MonoBehaviour
                         ColorFrame colorFrame = new ColorFrame(ticks, SoftwareBitmap.Copy(frameBitmap));
                         colorFrame.extrinsics = M is System.Numerics.Matrix4x4 ext ? ext : System.Numerics.Matrix4x4.Identity;
                         colorFrame.intrinsics = projMat;
+                        CaptureJointPositions(colorFrame);
                         colorFrames.Add(colorFrame);
                     }
 
@@ -331,86 +336,98 @@ public class AnimationRecorder : MonoBehaviour
 
     }
 
-    //protected void CaptureJointPositions(out ArrayList leftHandPoses, out ArrayList rightHandPoses)
-    //{
-        //// Get hand positions for segmentation
-        //MixedRealityPose pose;
+    protected void CaptureJointPositions(ColorFrame cf)
+    {
+        // Get hand positions for segmentation
+        MixedRealityPose pose;
 
         //foreach (int joint in Enum.GetValues(typeof(TrackedHandJoint)))
         //{
         //    if (HandJointUtils.TryGetJointPose(joint, Handedness.Right, out pose))
         //    {
-        //        rightHandPoses.Add(pose);
+        //        cf.rightJoints.Add(pose.Position);
         //    }
         //    else
         //    {
-        //        rightHandPoses.Add(null);
+        //        //rightHandPoses.Add(null);
         //    }
 
         //    if (HandJointUtils.TryGetJointPose(joint, Handedness.Left, out pose))
         //    {
-        //        leftHandPoses.Add(pose);
+        //        cf.leftJoints.Add(pose.Position);
         //    }
         //    else
         //    {
-        //        leftHandPoses.Add(null);
+        //        //leftHandPoses.Add(null);
         //    }
         //}
 
-    //}
+    }
 
 #endif
     private void PollDepthSensor()
     {
-        long timeStamp = 0;
-        System.Random rand = new System.Random(0);
-        float[] samplePoints = new float[20];
-        for (int i = 0; i < 20; ++i)
-        {
-            samplePoints[i] = (float) (rand.NextDouble() * 512);
-        }
-        while (recording)
-        {
-#if ENABLE_WINMD_SUPPORT
-            if (researchMode.DepthMapTextureUpdated())
-            {
-                // Append depth frame
-                ushort[] depthFrame = new ushort[512 * 512];
-                Array.Copy(researchMode.GetDepthMapBuffer(out timeStamp), depthFrame, 512 * 512);
-                dbg.Log($"Got new depthmaptexture with timestamp {timeStamp}!");
-                DepthFrame frame = new DepthFrame(timeStamp, depthFrame);
-                frame.xy = researchMode.GetLUTEntries(samplePoints);
-                frame.uv = samplePoints;
-                frame.extrinsics = System.Numerics.Matrix4x4.Identity;
-                float[] M = researchMode.GetDepthToWorld();
-                System.Numerics.Matrix4x4 ext = new System.Numerics.Matrix4x4();
+//        long timeStamp = 0;
+//        System.Random rand = new System.Random(0);
+//        float[] samplePoints = new float[20];
+//        for (int i = 0; i < 20; ++i)
+//        {
+//            samplePoints[i] = (float) (rand.NextDouble() * 512);
+//        }
+//        while (recording)
+//        {
+//#if ENABLE_WINMD_SUPPORT
+//            if (researchMode.DepthMapTextureUpdated())
+//            {
+//                try 
+//                {
+//                    // Append depth frame
+//                    ushort[] depthFrame = new ushort[512 * 512];
+//                    Array.Copy(researchMode.GetDepthMapBuffer(out timeStamp), depthFrame, 512 * 512);
+//                    dbg.Log($"Got new depthmaptexture with timestamp {timeStamp}!");
+//                    DepthFrame frame = new DepthFrame(timeStamp, depthFrame);
 
-                // This is ridiculous but apparently indexing a matrix by row/col is not supported :(
-                ext.M11 = M[0];
-                ext.M12 = M[1];
-                ext.M13 = M[2];
-                ext.M14 = M[3];
-                ext.M21 = M[4];
-                ext.M22 = M[5];
-                ext.M23 = M[6];
-                ext.M24 = M[7];
-                ext.M31 = M[8];
-                ext.M32 = M[9];
-                ext.M33 = M[10];
-                ext.M34 = M[11];
-                ext.M41 = M[12];
-                ext.M42 = M[13];
-                ext.M43 = M[14];
-                ext.M44 = M[15];
+//                    frame.pc = new PointCloud(researchMode.GetPointCloudBuffer(), true);
+//;
+//                    // Get mapping for optimization
+//                    if (this.mappings == null)
+//                        this.mappings = researchMode.GetMappings();
 
-                frame.extrinsics = ext;
+//                    frame.extrinsics = System.Numerics.Matrix4x4.Identity;
+//                    float[] M = researchMode.GetDepthToWorld();
+//                    System.Numerics.Matrix4x4 ext = new System.Numerics.Matrix4x4();
 
-                //frame.pc = new PointCloud(researchMode.GetPointCloudBuffer());
+//                    // This is ridiculous but apparently indexing a matrix by row/col is not supported :(
+//                    ext.M11 = M[0];
+//                    ext.M12 = M[1];
+//                    ext.M13 = M[2];
+//                    ext.M14 = M[3];
+//                    ext.M21 = M[4];
+//                    ext.M22 = M[5];
+//                    ext.M23 = M[6];
+//                    ext.M24 = M[7];
+//                    ext.M31 = M[8];
+//                    ext.M32 = M[9];
+//                    ext.M33 = M[10];
+//                    ext.M34 = M[11];
+//                    ext.M41 = M[12];
+//                    ext.M42 = M[13];
+//                    ext.M43 = M[14];
+//                    ext.M44 = M[15];
 
-                depthFrames.Add(frame);
-            }
-#endif
-        }
+//                    frame.extrinsics = ext;
+
+//                    //frame.pc = new PointCloud(researchMode.GetPointCloudBuffer());
+
+//                    depthFrames.Add(frame);
+//                }
+//                catch (Exception e)
+//                {
+//                    dbg.Log($"Caught exception while polling depth sensor: '{e.ToString()}'");
+//                }
+//            }
+//#endif
+//        }
     }
 
     public async void ToggleRecording()
@@ -422,8 +439,9 @@ public class AnimationRecorder : MonoBehaviour
             {
                 recording = false;
 #if ENABLE_WINMD_SUPPORT
-                // Stop polling depth sensor
-                depthPollingThread.Join();
+                // Stop depth capture
+                researchMode.StopDepthSensorLoop();
+                //depthPollingThread.Join();
                 // Stop video stream
                 await videoFrameReader.StopAsync();
                 var recordingEnd = DateTime.Now;
@@ -468,65 +486,149 @@ public class AnimationRecorder : MonoBehaviour
                             writer.WriteLine($"{frame.intrinsics.M31}, {frame.intrinsics.M32}, {frame.intrinsics.M33}, {frame.intrinsics.M34}");
                             writer.WriteLine($"{frame.intrinsics.M41}, {frame.intrinsics.M42}, {frame.intrinsics.M43}, {frame.intrinsics.M44}");
                         }
-                        dbg.Log($"Processed rgb frame {i+1} of {colorFrames.Count}, number of depth images is {depthFrames.Count}");
+
+                        dbg.Log($"Processed rgb frame {i+1} of {colorFrames.Count}, number of depth images is {researchMode.GetPointCloudCount()}");
                     }
 
 
-                    for (int i = 0; i < depthFrames.Count; ++i)
-                    {
-                        ushort max = 0;
-                        Texture2D depthTexture = new Texture2D(512, 512);//, TextureFormat.R16, false);
-                        //ushort[] depths = (ushort[])depthFrames[i];
-                        DepthFrame frame = (DepthFrame)depthFrames[i];
-                        ushort[] depths = frame.data;
+                    //for (int i = 0; i < depthFrames.Count; ++i)
+                    //{
+                    //    ushort max = 0;
+                    //    Texture2D depthTexture = new Texture2D(512, 512);//, TextureFormat.R16, false);
+                    //    //ushort[] depths = (ushort[])depthFrames[i];
+                    //    DepthFrame frame = (DepthFrame)depthFrames[i];
+                    //    ushort[] depths = frame.data;
 
-                        var pixels = new Color32[512*512];
-                        for(int row = 0; row < 512; ++row)
-                        {
-                            for(int col = 0; col < 512; ++col)
-                            {
-                                int idx = 512 * row + col;
-                                ushort val = depths[idx];
-                                if (val > 4090) val = 0;
-                                if (val > max) max = val;
+                    //    var pixels = new Color32[512*512];
+                    //    for(int row = 0; row < 512; ++row)
+                    //    {
+                    //        for(int col = 0; col < 512; ++col)
+                    //        {
+                    //            int idx = 512 * row + col;
+                    //            ushort val = depths[idx];
+                    //            if (val > 4090) val = 0;
+                    //            if (val > max) max = val;
 
-                                pixels[idx] = new Color32((byte)(val >> 8), (byte)(val & 0xFF), 0, 0xFF);
-                                //depthTexture.SetPixel(512 - row, 512 - col,
-                                //            new Color32((byte)(val / 256), (byte)(val % 256), 0, 255));
-                            }
-                        }
-                        depthTexture.SetPixels32(pixels);
-                        depthTexture.Apply();
-                        byte[] bytes = ImageConversion.EncodeToPNG(depthTexture);
-                        File.WriteAllBytes($"{storageFolder.Path}/depth/{i:D6}.png", bytes);
+                    //            pixels[idx] = new Color32((byte)(val >> 8), (byte)(val & 0xFF), 0, 0xFF);
+                    //            //depthTexture.SetPixel(512 - row, 512 - col,
+                    //            //            new Color32((byte)(val / 256), (byte)(val % 256), 0, 255));
+                    //        }
+                    //    }
+                    //    depthTexture.SetPixels32(pixels);
+                    //    depthTexture.Apply();
+                    //    byte[] bytes = ImageConversion.EncodeToPNG(depthTexture);
+                    //    File.WriteAllBytes($"{storageFolder.Path}/depth/{i:D6}.png", bytes);
 
-                        using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/depth/meta_{i:D6}.txt"))
-                        {
-                            // Write time stamp to correlate rgb and depth images
-                            writer.WriteLine($"{frame.timeStamp}");
+                    //    using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/depth/meta_{i:D6}.txt"))
+                    //    {
+                    //        // Write time stamp to correlate rgb and depth images
+                    //        writer.WriteLine($"{frame.timeStamp}");
 
-                            // Write pose
-                            writer.WriteLine($"{frame.extrinsics.M11}, {frame.extrinsics.M12}, {frame.extrinsics.M13}, {frame.extrinsics.M14}");
-                            writer.WriteLine($"{frame.extrinsics.M21}, {frame.extrinsics.M22}, {frame.extrinsics.M23}, {frame.extrinsics.M24}");
-                            writer.WriteLine($"{frame.extrinsics.M31}, {frame.extrinsics.M32}, {frame.extrinsics.M33}, {frame.extrinsics.M34}");
-                            writer.WriteLine($"{frame.extrinsics.M41}, {frame.extrinsics.M42}, {frame.extrinsics.M43}, {frame.extrinsics.M44}");
+                    //        // Write pose
+                    //        writer.WriteLine($"{frame.extrinsics.M11}, {frame.extrinsics.M12}, {frame.extrinsics.M13}, {frame.extrinsics.M14}");
+                    //        writer.WriteLine($"{frame.extrinsics.M21}, {frame.extrinsics.M22}, {frame.extrinsics.M23}, {frame.extrinsics.M24}");
+                    //        writer.WriteLine($"{frame.extrinsics.M31}, {frame.extrinsics.M32}, {frame.extrinsics.M33}, {frame.extrinsics.M34}");
+                    //        writer.WriteLine($"{frame.extrinsics.M41}, {frame.extrinsics.M42}, {frame.extrinsics.M43}, {frame.extrinsics.M44}");
 
-                            // Write uv <-> xy correspondence to calculate depth intrinsics
-                            for(int j = 0; j < frame.xy.Length; j += 2) 
-                            {
-                                writer.WriteLine($"{frame.xy[j]}, {frame.xy[j+1]}, {frame.uv[j]}, {frame.uv[j+1]}");
-                            }
-                        }
-                        //frame.pc.Build();
-                        //frame.pc.ExportToPLY($"{storageFolder.Path}/depth/PointCloud_{i:D6}.ply");
-                        dbg.Log($"Processed depth frame {i+1}, max depth = {max}; new!");
-                    }
+                    //    }
+
+                    //    //frame.pc.Build();
+                    //    frame.pc.ExportToPLY($"{storageFolder.Path}/depth/PointCloud_{i:D6}.ply");
+                    //    dbg.Log($"Processed depth frame {i+1}, max depth = {max}; new!");
+                    //}
+
+
+                    //using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/depth/mappings.txt"))
+                    //{
+                    //    for (int j = 0; j < 512 * 512; ++j) 
+                    //    {
+                    //        writer.WriteLine($"{this.mappings[3*j]} {this.mappings[3*j+1]} {this.mappings[3*j+2]}");
+                    //    }
+                    //}
+
                     double seconds = (recordingEnd - recordingStart).TotalSeconds;
-                    dbg.Log($"Done processing! Depth frame rate = {depthFrames.Count / seconds}, RGB frame rate = {colorFrames.Count / seconds}");
+                    dbg.Log($"Done processing! Depth frame rate = {researchMode.GetPointCloudCount() / seconds}, RGB frame rate = {colorFrames.Count / seconds}");
 
-                    // Reset frames
+                    //dbg.Log("Starting to optimize");
+                    //List<Point2D> imagePoints = new List<Point2D>();
+                    //List<Point3D> worldPoints = new List<Point3D>();
+                    //// Convert data to right format and optimize
+                    //for (int i = 0; i < 512; i++)
+                    //{
+                    //    for (int j = 0; j < 512; j++)
+                    //    {
+                    //        imagePoints.Add(new Point2D(j + 0.5, i + 0.5 ));
+                    //        worldPoints.Add(
+                    //            new Point3D(this.mappings[3*(i * 512 + j) + 0],
+                    //                        this.mappings[3*(i * 512 + j) + 1],
+                    //                        this.mappings[3*(i * 512 + j) + 2]));
+                    //    }
+                    //}
+
+                    //// Initialize a starting camera matrix
+                    //var initialCameraMatrix = Matrix<double>.Build.Dense(3, 3);
+                    //var initialDistortion = Vector<double>.Build.Dense(2);
+                    //initialCameraMatrix[0, 0] = 250; // fx
+                    //initialCameraMatrix[1, 1] = 250; // fy
+                    //initialCameraMatrix[0, 2] = 256; // cx
+                    //initialCameraMatrix[1, 2] = 256; // cy
+                    //initialCameraMatrix[2, 2] = 1;
+
+
+                    //// Run optimization
+                    //Calibration.CalibrateCameraIntrinsics(worldPoints,
+                    //                                      imagePoints,
+                    //                                      initialCameraMatrix,
+                    //                                      initialDistortion,
+                    //                                      out var computedCameraMatrix,
+                    //                                      out var computedDistortionCoefficients,
+                    //                                      false);
+
+
+                    //// Write intrinsics to file
+                    //using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/depth/cameraParams.txt"))
+                    //{
+                    //    writer.WriteLine($"{computedCameraMatrix[0, 0]} {computedCameraMatrix[1, 1]} {computedCameraMatrix[0, 2]} {computedCameraMatrix[1, 2]} {computedDistortionCoefficients[0]} {computedDistortionCoefficients[1]}");
+                    //}
+
+                    //dbg.Log($"Done optimizing, computed coefficients: {computedCameraMatrix[0, 0]} {computedCameraMatrix[1, 1]} {computedCameraMatrix[0, 2]} {computedCameraMatrix[1, 2]} {computedDistortionCoefficients[0]} {computedDistortionCoefficients[1]}");
+
+                    using (StreamWriter logWriter = new StreamWriter($"{storageFolder.Path}/depth/depthLog.txt"))
+                    {
+                        // Construct point clouds and write them to files
+                        for (uint i = 0; i < researchMode.GetPointCloudCount(); ++i) 
+                        {
+                            long timeStamp = 0;
+                            float[] coordinates = researchMode.GetPointCloud(i, out timeStamp);
+                            dbg.Log($"Got point cloud {i}, {coordinates[0]} {coordinates[1]} {coordinates[2]}");
+                            logWriter.WriteLine($"Got point cloud {i}");
+                            PointCloud pc = new PointCloud(coordinates, true);
+                            float[] M = researchMode.GetDepthToWorld(timeStamp);
+                            logWriter.WriteLine($"Got extrinsics for {i}");
+                            // TODO: complete here!
+                            pc.ExportToPLY($"{storageFolder.Path}/depth/PointCloud_{i:D6}.ply");
+
+                            using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/depth/meta_{i:D6}.txt"))
+                            {
+                                // Write time stamp to correlate rgb and depth images
+                                writer.WriteLine($"{timeStamp}");
+
+                                // Write pose
+                                writer.WriteLine($"{M[0]},  {M[1]},  {M[2]},  {M[3]}");
+                                writer.WriteLine($"{M[4]},  {M[5]},  {M[6]},  {M[7]}");
+                                writer.WriteLine($"{M[8]},  {M[9]},  {M[10]}, {M[11]}");
+                                writer.WriteLine($"{M[12]}, {M[13]}, {M[14]}, {M[15]}");
+                            }
+
+                        dbg.Log($"Processed point cloud {i+1}");
+
+                        }
+                    }
+
+                    // Reset frames and mapping
                     colorFrames = new ArrayList();
-                    depthFrames = new ArrayList();
+                    //depthFrames = new ArrayList();
+                    //this.mappings = null;
                 }
                 catch(Exception e)
                 {
@@ -553,21 +655,30 @@ public class AnimationRecorder : MonoBehaviour
             recordingStart = DateTime.Now;
 #if ENABLE_WINMD_SUPPORT
 
-            // Start video
-            var status = await videoFrameReader.StartAsync();
-            if (status == MediaFrameReaderStartStatus.Success)
+            try 
             {
-                dbg.Log("Successfully started mediaframereader!");
+                // Start video
+                var status = await videoFrameReader.StartAsync();
+                if (status == MediaFrameReaderStartStatus.Success)
+                {
+                    dbg.Log("Successfully started mediaframereader!");
+                }
+                else
+                {
+                    dbg.Log($"Failed to start mediaframereader!, status = {status}");
+                }
+
+                // Start depth capture
+                researchMode.StartDepthSensorLoop(true);
             }
-            else
+            catch(Exception e)
             {
-                dbg.Log($"Failed to start mediaframereader!, status = {status}");
+                dbg.Log(e.ToString());
             }
 #endif
-            // Start depth capture
-            depthPollingThread = new Thread(new ThreadStart(PollDepthSensor));
-            depthPollingThread.Start();
-            picture = 0;
+            //depthPollingThread = new Thread(new ThreadStart(PollDepthSensor));
+            //depthPollingThread.Start();
+            //picture = 0;
         }
     }
 
@@ -583,7 +694,6 @@ public class AnimationRecorder : MonoBehaviour
             researchMode.SetPointCloudDepthOffset(0);
 
             //researchMode.StartDepthSensorLoop(false);
-            researchMode.StartDepthSensorLoop(true);
             //researchMode.StartSpatialCamerasFrontLoop();
             dbg.Log("Initialized research mode");
         } catch (Exception e) {
