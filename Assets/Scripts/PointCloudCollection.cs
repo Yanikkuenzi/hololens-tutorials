@@ -5,6 +5,7 @@ using System;
 using UnityEngine.Video;
 using System.Security.Cryptography;
 using System.Net.Http.Headers;
+using System.Configuration;
 
 #if ENABLE_WINMD_SUPPORT
 using Windows.Storage;
@@ -92,8 +93,8 @@ public class PointCloudCollection : MonoBehaviour
             return false;
         }
 
-        int n = Math.Min(filenames.Length, 2);
-        //int n = filenames.Length;
+        //int n = Math.Min(filenames.Length, 2);
+        int n = filenames.Length;
         Debug.Log(string.Format("Loading {0} ply files", n));
 
         // Initialize enough space for all the point clouds
@@ -107,6 +108,7 @@ public class PointCloudCollection : MonoBehaviour
         {
             this.clouds.Add(new PointCloud(filenames[i]));
         }
+        Debug.Log("Loaded all files");
 
         return true;
     }

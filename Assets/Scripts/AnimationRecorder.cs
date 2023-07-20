@@ -36,7 +36,6 @@ public class AnimationRecorder : MonoBehaviour
     private PointCloudCollection current_animation;
 
     private PhotoCapture photoCaptureObject = null;
-    int picture = 0;
     private Texture2D targetTexture = null;
     private CameraParameters cameraParameters;
     private DateTime recordingStart;
@@ -86,7 +85,7 @@ public class AnimationRecorder : MonoBehaviour
 
         try
         {
-            InitResearchMode();
+            //InitResearchMode();
         }
         catch (Exception e)
         {
@@ -104,18 +103,18 @@ public class AnimationRecorder : MonoBehaviour
         try
         {
 
-            if (researchMode == null)
-            {
-                dbg.Log("Research mode is null");
-                try 
-                {
-                    InitResearchMode();
-                } 
-                catch (Exception e)
-                {
-                    dbg.Log("Cannot init researchmode! -- " + e.ToString());
-                }
-            }
+            //if (researchMode == null)
+            //{
+            //    dbg.Log("Research mode is null");
+            //    try 
+            //    {
+            //        InitResearchMode();
+            //    } 
+            //    catch (Exception e)
+            //    {
+            //        dbg.Log("Cannot init researchmode! -- " + e.ToString());
+            //    }
+            //}
 
             //if (!researchMode.PointCloudUpdated()) {
             //    //dbg.Log("point cloud not updated, returning now");
@@ -280,7 +279,7 @@ public class AnimationRecorder : MonoBehaviour
 
     async void FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
     {
-        dbg.Log("Frame arrived");
+        //dbg.Log("Frame arrived");
         try 
         {
             using (var frame = sender.TryAcquireLatestFrame())
@@ -333,7 +332,6 @@ public class AnimationRecorder : MonoBehaviour
         {
             dbg.Log($"Caught exception in FrameArrived: '{e.ToString()}'");
         }
-
     }
 
     protected void CaptureJointPositions(ColorFrame cf)
@@ -341,26 +339,27 @@ public class AnimationRecorder : MonoBehaviour
         // Get hand positions for segmentation
         MixedRealityPose pose;
 
-        //foreach (int joint in Enum.GetValues(typeof(TrackedHandJoint)))
-        //{
-        //    if (HandJointUtils.TryGetJointPose(joint, Handedness.Right, out pose))
-        //    {
-        //        cf.rightJoints.Add(pose.Position);
-        //    }
-        //    else
-        //    {
-        //        //rightHandPoses.Add(null);
-        //    }
+        foreach (var jointName in Enum.GetNames(typeof(TrackedHandJoint)))
+        {
+            TrackedHandJoint joint = (TrackedHandJoint) Enum.Parse(typeof(TrackedHandJoint), jointName);
+            if (HandJointUtils.TryGetJointPose(joint, Handedness.Right, out pose))
+            {
+                cf.rightJoints.Add(pose.Position);
+            }
+            else
+            {
+                cf.rightJoints.Add(UnityEngine.Vector3.zero);
+            }
 
-        //    if (HandJointUtils.TryGetJointPose(joint, Handedness.Left, out pose))
-        //    {
-        //        cf.leftJoints.Add(pose.Position);
-        //    }
-        //    else
-        //    {
-        //        //leftHandPoses.Add(null);
-        //    }
-        //}
+            if (HandJointUtils.TryGetJointPose(joint, Handedness.Left, out pose))
+            {
+                cf.leftJoints.Add(pose.Position);
+            }
+            else
+            {
+                cf.leftJoints.Add(UnityEngine.Vector3.zero);
+            }
+        }
 
     }
 
@@ -369,63 +368,70 @@ public class AnimationRecorder : MonoBehaviour
     {
 //        long timeStamp = 0;
 //        System.Random rand = new System.Random(0);
-//        float[] samplePoints = new float[20];
-//        for (int i = 0; i < 20; ++i)
-//        {
-//            samplePoints[i] = (float) (rand.NextDouble() * 512);
-//        }
+//        //float[] samplePoints = new float[20];
+//        //for (int i = 0; i < 20; ++i)
+//        //{
+//        //    samplePoints[i] = (float)(rand.NextDouble() * 512);
+//        //}
 //        while (recording)
 //        {
 //#if ENABLE_WINMD_SUPPORT
-//            if (researchMode.DepthMapTextureUpdated())
-//            {
-//                try 
-//                {
-//                    // Append depth frame
-//                    ushort[] depthFrame = new ushort[512 * 512];
-//                    Array.Copy(researchMode.GetDepthMapBuffer(out timeStamp), depthFrame, 512 * 512);
-//                    dbg.Log($"Got new depthmaptexture with timestamp {timeStamp}!");
-//                    DepthFrame frame = new DepthFrame(timeStamp, depthFrame);
+//                    if (researchMode.PointCloudUpdated())
+//                    {
+//                        try 
+//                        {
+//                            // Append depth frame
+//                            //ushort[] depthFrame = new ushort[512 * 512];
+//                            //Array.Copy(researchMode.GetDepthMapBuffer(out timeStamp), depthFrame, 512 * 512);
+//                            //dbg.Log($"Got new depthmaptexture with timestamp {timeStamp}!");
+//                            //DepthFrame frame = new DepthFrame(timeStamp, depthFrame);
 
-//                    frame.pc = new PointCloud(researchMode.GetPointCloudBuffer(), true);
-//;
-//                    // Get mapping for optimization
-//                    if (this.mappings == null)
-//                        this.mappings = researchMode.GetMappings();
+//                            //researchMode.GetDepthMapBuffer(out timeStamp);
+//                            //DepthFrame frame = new DepthFrame(timeStamp, null);
 
-//                    frame.extrinsics = System.Numerics.Matrix4x4.Identity;
-//                    float[] M = researchMode.GetDepthToWorld();
-//                    System.Numerics.Matrix4x4 ext = new System.Numerics.Matrix4x4();
+//                            var coordinates = researchMode.GetPointCloudBuffer();
+//                            if (coordinates == null) 
+//                            {
+//                                dbg.Log("coordinates are null");
+//                                continue;
+//                            }
+//                            frame.pc = new PointCloud(coordinates, true);
+//        ;
+//                            // Get mapping for optimization
+//                            //if (this.mappings == null)
+//                            //    this.mappings = researchMode.GetMappings();
 
-//                    // This is ridiculous but apparently indexing a matrix by row/col is not supported :(
-//                    ext.M11 = M[0];
-//                    ext.M12 = M[1];
-//                    ext.M13 = M[2];
-//                    ext.M14 = M[3];
-//                    ext.M21 = M[4];
-//                    ext.M22 = M[5];
-//                    ext.M23 = M[6];
-//                    ext.M24 = M[7];
-//                    ext.M31 = M[8];
-//                    ext.M32 = M[9];
-//                    ext.M33 = M[10];
-//                    ext.M34 = M[11];
-//                    ext.M41 = M[12];
-//                    ext.M42 = M[13];
-//                    ext.M43 = M[14];
-//                    ext.M44 = M[15];
+//                            frame.extrinsics = System.Numerics.Matrix4x4.Identity;
+//                            float[] M = researchMode.GetCurrentDepthToWorld();
+//                            System.Numerics.Matrix4x4 ext = new System.Numerics.Matrix4x4();
 
-//                    frame.extrinsics = ext;
+//                            // This is ridiculous but apparently indexing a matrix by row/col is not supported :(
+//                            ext.M11 = M[0];
+//                            ext.M12 = M[1];
+//                            ext.M13 = M[2];
+//                            ext.M14 = M[3];
+//                            ext.M21 = M[4];
+//                            ext.M22 = M[5];
+//                            ext.M23 = M[6];
+//                            ext.M24 = M[7];
+//                            ext.M31 = M[8];
+//                            ext.M32 = M[9];
+//                            ext.M33 = M[10];
+//                            ext.M34 = M[11];
+//                            ext.M41 = M[12];
+//                            ext.M42 = M[13];
+//                            ext.M43 = M[14];
+//                            ext.M44 = M[15];
 
-//                    //frame.pc = new PointCloud(researchMode.GetPointCloudBuffer());
+//                            frame.extrinsics = ext;
 
-//                    depthFrames.Add(frame);
-//                }
-//                catch (Exception e)
-//                {
-//                    dbg.Log($"Caught exception while polling depth sensor: '{e.ToString()}'");
-//                }
-//            }
+//                            depthFrames.Add(frame);
+//                        }
+//                        catch (Exception e)
+//                        {
+//                            dbg.Log($"Caught exception while polling depth sensor: '{e.ToString()}'");
+//                        }
+//                    }
 //#endif
 //        }
     }
@@ -469,6 +475,23 @@ public class AnimationRecorder : MonoBehaviour
                             await (await storageFolder.GetFolderAsync("rgb")).CreateFileAsync($"{i:D6}.png", Windows.Storage.CreationCollisionOption.ReplaceExisting);
                         SaveSoftwareBitmapToFile(bmp, file);
 
+                        using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/rgb/joints_{i:D6}.txt"))
+                        {
+                            // Write pose
+                            foreach (var joint in frame.leftJoints)
+                            {
+                                UnityEngine.Vector3 vecJoint = (UnityEngine.Vector3)joint;
+                                writer.WriteLine($"{vecJoint.x} {vecJoint.y} {vecJoint.z}");
+                            }
+
+                            foreach (var joint in frame.rightJoints)
+                            {
+                                UnityEngine.Vector3 vecJoint = (UnityEngine.Vector3)joint;
+                                writer.WriteLine($"{vecJoint.x} {vecJoint.y} {vecJoint.z}");
+                            }
+
+                        }
+
                         using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/rgb/meta_{i:D6}.txt"))
                         {
                             // Write time stamp to correlate rgb and depth images
@@ -493,33 +516,32 @@ public class AnimationRecorder : MonoBehaviour
 
                     //for (int i = 0; i < depthFrames.Count; ++i)
                     //{
-                    //    ushort max = 0;
-                    //    Texture2D depthTexture = new Texture2D(512, 512);//, TextureFormat.R16, false);
+                    //    //Texture2D depthTexture = new Texture2D(512, 512);//, TextureFormat.R16, false);
                     //    //ushort[] depths = (ushort[])depthFrames[i];
                     //    DepthFrame frame = (DepthFrame)depthFrames[i];
-                    //    ushort[] depths = frame.data;
+                    //    //ushort[] depths = frame.data;
 
-                    //    var pixels = new Color32[512*512];
-                    //    for(int row = 0; row < 512; ++row)
-                    //    {
-                    //        for(int col = 0; col < 512; ++col)
-                    //        {
-                    //            int idx = 512 * row + col;
-                    //            ushort val = depths[idx];
-                    //            if (val > 4090) val = 0;
-                    //            if (val > max) max = val;
+                    //    //var pixels = new Color32[512*512];
+                    //    //for(int row = 0; row < 512; ++row)
+                    //    //{
+                    //    //    for(int col = 0; col < 512; ++col)
+                    //    //    {
+                    //    //        int idx = 512 * row + col;
+                    //    //        ushort val = depths[idx];
+                    //    //        if (val > 4090) val = 0;
+                    //    //        if (val > max) max = val;
 
-                    //            pixels[idx] = new Color32((byte)(val >> 8), (byte)(val & 0xFF), 0, 0xFF);
-                    //            //depthTexture.SetPixel(512 - row, 512 - col,
-                    //            //            new Color32((byte)(val / 256), (byte)(val % 256), 0, 255));
-                    //        }
-                    //    }
-                    //    depthTexture.SetPixels32(pixels);
-                    //    depthTexture.Apply();
-                    //    byte[] bytes = ImageConversion.EncodeToPNG(depthTexture);
-                    //    File.WriteAllBytes($"{storageFolder.Path}/depth/{i:D6}.png", bytes);
+                    //    //        pixels[idx] = new Color32((byte)(val >> 8), (byte)(val & 0xFF), 0, 0xFF);
+                    //    //        //depthTexture.SetPixel(512 - row, 512 - col,
+                    //    //        //            new Color32((byte)(val / 256), (byte)(val % 256), 0, 255));
+                    //    //    }
+                    //    //}
+                    //    //depthTexture.SetPixels32(pixels);
+                    //    //depthTexture.Apply();
+                    //    //byte[] bytes = ImageConversion.EncodeToPNG(depthTexture);
+                    //    //File.WriteAllBytes($"{storageFolder.Path}/depth/{i:D6}.png", bytes);
 
-                    //    using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/depth/meta_{i:D6}.txt"))
+                    //    using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/depth_old/meta_{i:D6}.txt"))
                     //    {
                     //        // Write time stamp to correlate rgb and depth images
                     //        writer.WriteLine($"{frame.timeStamp}");
@@ -529,12 +551,14 @@ public class AnimationRecorder : MonoBehaviour
                     //        writer.WriteLine($"{frame.extrinsics.M21}, {frame.extrinsics.M22}, {frame.extrinsics.M23}, {frame.extrinsics.M24}");
                     //        writer.WriteLine($"{frame.extrinsics.M31}, {frame.extrinsics.M32}, {frame.extrinsics.M33}, {frame.extrinsics.M34}");
                     //        writer.WriteLine($"{frame.extrinsics.M41}, {frame.extrinsics.M42}, {frame.extrinsics.M43}, {frame.extrinsics.M44}");
+                    //        // TODO: remove
+                    //        writer.WriteLine($"Points: {frame.pc.Count}");
 
                     //    }
 
                     //    //frame.pc.Build();
-                    //    frame.pc.ExportToPLY($"{storageFolder.Path}/depth/PointCloud_{i:D6}.ply");
-                    //    dbg.Log($"Processed depth frame {i+1}, max depth = {max}; new!");
+                    //    frame.pc.ExportToPLY($"{storageFolder.Path}/depth_old/{i:D6}.ply");
+                    //    dbg.Log($"Processed depth frame {i+1} old!");
                     //}
 
 
@@ -546,8 +570,6 @@ public class AnimationRecorder : MonoBehaviour
                     //    }
                     //}
 
-                    double seconds = (recordingEnd - recordingStart).TotalSeconds;
-                    dbg.Log($"Done processing! Depth frame rate = {researchMode.GetPointCloudCount() / seconds}, RGB frame rate = {colorFrames.Count / seconds}");
 
                     //dbg.Log("Starting to optimize");
                     //List<Point2D> imagePoints = new List<Point2D>();
@@ -593,42 +615,38 @@ public class AnimationRecorder : MonoBehaviour
 
                     //dbg.Log($"Done optimizing, computed coefficients: {computedCameraMatrix[0, 0]} {computedCameraMatrix[1, 1]} {computedCameraMatrix[0, 2]} {computedCameraMatrix[1, 2]} {computedDistortionCoefficients[0]} {computedDistortionCoefficients[1]}");
 
-                    using (StreamWriter logWriter = new StreamWriter($"{storageFolder.Path}/depth/depthLog.txt"))
+                    // Construct point clouds and write them to files
+                    for (uint i = 0; i < researchMode.GetPointCloudCount(); ++i) 
                     {
-                        // Construct point clouds and write them to files
-                        for (uint i = 0; i < researchMode.GetPointCloudCount(); ++i) 
+                        long timeStamp = 0;
+                        float[] coordinates = researchMode.GetPointCloud(i, out timeStamp);
+                        PointCloud pc = new PointCloud(coordinates, true);
+                        float[] M = researchMode.GetDepthToWorld(i);
+                        pc.ExportToPLY($"{storageFolder.Path}/depth/{i:D6}.ply");
+
+                        using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/depth/meta_{i:D6}.txt"))
                         {
-                            long timeStamp = 0;
-                            float[] coordinates = researchMode.GetPointCloud(i, out timeStamp);
-                            dbg.Log($"Got point cloud {i}, {coordinates[0]} {coordinates[1]} {coordinates[2]}");
-                            logWriter.WriteLine($"Got point cloud {i}");
-                            PointCloud pc = new PointCloud(coordinates, true);
-                            float[] M = researchMode.GetDepthToWorld(timeStamp);
-                            logWriter.WriteLine($"Got extrinsics for {i}");
-                            // TODO: complete here!
-                            pc.ExportToPLY($"{storageFolder.Path}/depth/PointCloud_{i:D6}.ply");
+                            // Write time stamp to correlate rgb and depth images
+                            writer.WriteLine($"{timeStamp}");
 
-                            using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/depth/meta_{i:D6}.txt"))
-                            {
-                                // Write time stamp to correlate rgb and depth images
-                                writer.WriteLine($"{timeStamp}");
-
-                                // Write pose
-                                writer.WriteLine($"{M[0]},  {M[1]},  {M[2]},  {M[3]}");
-                                writer.WriteLine($"{M[4]},  {M[5]},  {M[6]},  {M[7]}");
-                                writer.WriteLine($"{M[8]},  {M[9]},  {M[10]}, {M[11]}");
-                                writer.WriteLine($"{M[12]}, {M[13]}, {M[14]}, {M[15]}");
-                            }
-
-                        dbg.Log($"Processed point cloud {i+1}");
-
+                            // Write pose
+                            writer.WriteLine($"{M[0]}, {M[1]}, {M[2]}, {M[3]}");
+                            writer.WriteLine($"{M[4]}, {M[5]}, {M[6]}, {M[7]}");
+                            writer.WriteLine($"{M[8]}, {M[9]}, {M[10]}, {M[11]}");
+                            writer.WriteLine($"{M[12]}, {M[13]}, {M[14]}, {M[15]}");
                         }
+
+                    dbg.Log($"Processed point cloud {i+1}");
+
                     }
 
                     // Reset frames and mapping
                     colorFrames = new ArrayList();
-                    //depthFrames = new ArrayList();
+                    depthFrames = new ArrayList();
                     //this.mappings = null;
+
+                    double seconds = (recordingEnd - recordingStart).TotalSeconds;
+                    dbg.Log($"Done processing! Depth frame rate = {researchMode.GetPointCloudCount() / seconds}, RGB frame rate = {colorFrames.Count / seconds}");
                 }
                 catch(Exception e)
                 {
@@ -669,7 +687,8 @@ public class AnimationRecorder : MonoBehaviour
                 }
 
                 // Start depth capture
-                researchMode.StartDepthSensorLoop(true);
+                //researchMode.StartDepthSensorLoop(true);
+                InitResearchMode();
             }
             catch(Exception e)
             {
@@ -678,7 +697,6 @@ public class AnimationRecorder : MonoBehaviour
 #endif
             //depthPollingThread = new Thread(new ThreadStart(PollDepthSensor));
             //depthPollingThread.Start();
-            //picture = 0;
         }
     }
 
@@ -693,7 +711,7 @@ public class AnimationRecorder : MonoBehaviour
             researchMode.SetReferenceCoordinateSystem(unityWorldOrigin);
             researchMode.SetPointCloudDepthOffset(0);
 
-            //researchMode.StartDepthSensorLoop(false);
+            researchMode.StartDepthSensorLoop(true);
             //researchMode.StartSpatialCamerasFrontLoop();
             dbg.Log("Initialized research mode");
         } catch (Exception e) {

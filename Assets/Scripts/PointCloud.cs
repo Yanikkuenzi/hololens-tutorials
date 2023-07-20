@@ -120,7 +120,7 @@ public class PointCloud
                 //"comment {1}\n" +
                 //"comment {2}\n" +
                 "property double x\nproperty double y\nproperty double z\n" +
-                "property uchar red\nproperty uchar green\nproperty uchar blue\n" +
+                //"property uchar red\nproperty uchar green\nproperty uchar blue\n" +
                 "end_header", numberOfPoints);
                     //LeftHandPosition == null ? "" : "Left: " + LeftHandPosition.ToString(),
                     //RightHandPosition == null ? "" : "Right: " + RightHandPosition.ToString());
@@ -132,9 +132,11 @@ public class PointCloud
                 Vector3 coordinates = (Vector3)points[j];
                 Color point_color = (Color)colors[j];
 
-                writer.WriteLine(string.Format("{0} {1} {2} {3} {4} {5}",
-                    coordinates.x, coordinates.y, coordinates.z,
-                    (int)(point_color.r * 255), (int)(point_color.g * 255), (int)(point_color.b * 255)));
+                //writer.WriteLine(string.Format("{0} {1} {2} {3} {4} {5}",
+                //    coordinates.x, coordinates.y, coordinates.z,
+                //    (int)(point_color.r * 255), (int)(point_color.g * 255), (int)(point_color.b * 255)));
+                writer.WriteLine(string.Format("{0} {1} {2}",
+                    coordinates.x, coordinates.y, coordinates.z));
             }
         }
 

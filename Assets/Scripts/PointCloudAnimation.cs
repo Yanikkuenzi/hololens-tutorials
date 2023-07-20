@@ -24,9 +24,6 @@ public class PointCloudAnimation : MonoBehaviour
     public bool repeat = false;
     public bool playing = false;
 
-    // TODO: remove
-    public double distance = .5;
-
     public GameObject pointCloudRendererGo;
     private PointCloudRenderer pointCloudRenderer;
 
@@ -59,6 +56,7 @@ public class PointCloudAnimation : MonoBehaviour
 
         // Render point cloud
         PointCloud current = clouds.Get(current_idx);
+        Debug.Log($"Current cloud {current_idx} contains {current.Count} points");
         pointCloudRenderer.Render(current.Points, current.Colors);
 
         // Increment frame and wrap around if end is reached
@@ -73,24 +71,24 @@ public class PointCloudAnimation : MonoBehaviour
         if (clouds == null)
         {
             clouds = new PointCloudCollection();
-            clouds.LoadFromPLY("14-05-2023T04_16");
-            Matrix4x4 K = new Matrix4x4();
-            K[0, 0] = 687.6602f;
-            K[1, 1] = 688.903f;
-            K[0, 2] = 442.8347f;
-            K[1, 2] = 238.9398f;
-            K[2, 2] = 1f;
+            clouds.LoadFromPLY("TestCloud");
+            //Matrix4x4 K = new Matrix4x4();
+            //K[0, 0] = 687.6602f;
+            //K[1, 1] = 688.903f;
+            //K[0, 2] = 442.8347f;
+            //K[1, 2] = 238.9398f;
+            //K[2, 2] = 1f;
 
-            Debug.Log(K);
-            Texture2D tex = new Texture2D(1,1);
-            byte[] data = File.ReadAllBytes("Assets/Resources/image_1.jpg");
-            tex.LoadImage(data);
-            //RenderTexture(tex);
-            clouds.GetLast().cameraMatrix = K;
-            clouds.GetLast().ColorFromImage(tex);
-            clouds.GetLast().Colors[12] = Color.red;
-            clouds.GetLast().Colors[100] = Color.green;
-            clouds.GetLast().Colors[1000] = Color.blue;
+            //Debug.Log(K);
+            //Texture2D tex = new Texture2D(1,1);
+            //byte[] data = File.ReadAllBytes("Assets/Resources/image_1.jpg");
+            //tex.LoadImage(data);
+            ////RenderTexture(tex);
+            //clouds.GetLast().cameraMatrix = K;
+            //clouds.GetLast().ColorFromImage(tex);
+            //clouds.GetLast().Colors[12] = Color.red;
+            //clouds.GetLast().Colors[100] = Color.green;
+            //clouds.GetLast().Colors[1000] = Color.blue;
         }
         playing = !playing;
         pointCloudRendererGo.SetActive(playing);
