@@ -96,7 +96,7 @@ public class PointCloudAnimation : MonoBehaviour
 
     public void RenderTexture(Texture2D texture)
     {
-        GameObject quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        GameObject quad = GameObject.CreatePrimitive(PrimitiveType.Cube);
 
         // Set the position of the quad
         quad.transform.position = new Vector3(0, 0, 0);
