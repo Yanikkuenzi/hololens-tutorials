@@ -93,8 +93,8 @@ public class PointCloudCollection : MonoBehaviour
             return false;
         }
 
-        //int n = Math.Min(filenames.Length, 2);
-        int n = filenames.Length;
+        int n = Math.Min(filenames.Length, 2);
+        //int n = filenames.Length;
         Debug.Log(string.Format("Loading {0} ply files", n));
 
         // Initialize enough space for all the point clouds

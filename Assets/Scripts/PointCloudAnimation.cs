@@ -18,7 +18,7 @@ public class PointCloudAnimation : MonoBehaviour
     private PointCloudCollection clouds;
 
     private int current_idx = 0;
-    private int nFramesPerCloud = 30;
+    private int nFramesPerCloud = 10;
     private int nFramesShown = 0;
 
     public bool repeat = false;

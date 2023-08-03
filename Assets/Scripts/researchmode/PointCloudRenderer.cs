@@ -11,7 +11,7 @@ namespace Tutorials.ResearchMode
     public class PointCloudRenderer : MonoBehaviour
     {
         public int maxChunkSize = 65535;
-        public float pointSize = 0.005f;
+        public float pointSize = .0015f;
         public GameObject pointCloudElem;
         public Material pointCloudMaterial;
 
@@ -25,6 +25,7 @@ namespace Tutorials.ResearchMode
 
         void Update()
         {
+            pointSize = .0015f;
             if (transform.hasChanged)
             {
                 UpdatePointSize();
@@ -39,12 +40,35 @@ namespace Tutorials.ResearchMode
 
         public void Render(ArrayList arrVertices, ArrayList pointColors)
         {
+            pointSize = .0015f;
             int nPoints, nChunks;
+
             if (arrVertices == null)
             {
                 nPoints = 0;
                 nChunks = 0;
+                return;
             }
+
+            //for(int i = 0; i < elems.Count; ++i)
+            //{
+            //    GameObject.Destroy(elems[i]);
+            //}
+
+            //for (int i = 0; i < arrVertices.Count; i++)
+            //{
+            //    GameObject newElem = GameObject.Instantiate(pointCloudElem);
+            //    newElem.transform.parent = transform;
+            //    newElem.transform.localPosition = (Vector3)arrVertices[i];
+            //    newElem.transform.localRotation = Quaternion.identity;
+            //    //newElem.transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
+            //    newElem.GetComponent<Renderer>().material.SetColor("_Color", (Color)pointColors[i]);
+            //    elems.Add(newElem);
+
+            //}
+            //Debug.Log($"Created {arrVertices.Count} cubes for the point cloud");
+
+            // Previous
             else
             {
                 nPoints = arrVertices.Count;
