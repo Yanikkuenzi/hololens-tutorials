@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "com.microsoft.azure.object-anchors.runtime": "file:C:/Users/user/Downloads/com.microsoft.azure.object-anchors.runtime-0.25.0.tgz",
     "com.microsoft.mixedreality.toolkit.examples": "file:MixedReality/com.microsoft.mixedreality.toolkit.examples-2.7.3.tgz",
     "com.microsoft.mixedreality.toolkit.extensions": "file:MixedReality/com.microsoft.mixedreality.toolkit.extensions-2.7.3.tgz",
     "com.microsoft.mixedreality.toolkit.foundation": "file:MixedReality/com.microsoft.mixedreality.toolkit.foundation-2.7.3.tgz",
@@ -14,6 +15,7 @@
     "com.unity.textmeshpro": "2.1.6",
     "com.unity.timeline": "1.2.18",
     "com.unity.ugui": "1.0.0",
+    "com.unity.xr.arfoundation": "2.1.19",
     "com.unity.xr.windowsmr": "2.9.3",
     "de.thirteenpixels.gitmerge": "https://github.com/FlaShG/GitMerge-for-Unity.git",
     "com.unity.modules.ai": "1.0.0",

@@ -1,0 +1,6 @@
+Tutorial including a coffebox
+The description spans
+multiple lines in the 
+associated metafile
+lorem ipsum dolor
+sit amet

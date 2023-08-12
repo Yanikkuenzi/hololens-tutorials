@@ -10,6 +10,8 @@ using UnityEngine;
 public class ObjectManager : MonoBehaviour
 {
     public GameObject objectManagerPanel;
+    public GameObject logger;
+    public DebugOutput dbg;
 
     [SerializeField]
     private GameObject realObjects;
@@ -29,6 +31,10 @@ public class ObjectManager : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        if (dbg == null)
+        {
+            dbg = logger.GetComponent<DebugOutput>();
+        }
         foreach (Transform child in realObjects.transform)
         {
             child.gameObject.SetActive(false);
@@ -47,6 +53,7 @@ public class ObjectManager : MonoBehaviour
     /// </summary>
     public void SpawnObject(string type)
     {
+        dbg.Log($"Called SpawnObject with type '{type}'");
         if (!originalObjects.TryGetValue(type, out GameObject objectModel))
         {
             Debug.Log($"Object type not available: {type}");

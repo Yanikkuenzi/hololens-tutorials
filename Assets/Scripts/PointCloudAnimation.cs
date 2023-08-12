@@ -23,6 +23,7 @@ public class PointCloudAnimation : MonoBehaviour
 
     public bool repeat = false;
     public bool playing = false;
+    private string currentPointCloudName = "";
 
     public GameObject pointCloudRendererGo;
     private PointCloudRenderer pointCloudRenderer;
@@ -66,29 +67,14 @@ public class PointCloudAnimation : MonoBehaviour
     }
 
 
-    public void TogglePointCloud()
+    public void TogglePointCloud(string name)
     {
-        if (clouds == null)
+        // Load point cloud from memory if none is currently loaded
+        // or we want to display another one
+        if (clouds == null || !name.Equals(currentPointCloudName))
         {
             clouds = new PointCloudCollection();
-            clouds.LoadFromPLY("TestCloud");
-            //Matrix4x4 K = new Matrix4x4();
-            //K[0, 0] = 687.6602f;
-            //K[1, 1] = 688.903f;
-            //K[0, 2] = 442.8347f;
-            //K[1, 2] = 238.9398f;
-            //K[2, 2] = 1f;
-
-            //Debug.Log(K);
-            //Texture2D tex = new Texture2D(1,1);
-            //byte[] data = File.ReadAllBytes("Assets/Resources/image_1.jpg");
-            //tex.LoadImage(data);
-            ////RenderTexture(tex);
-            //clouds.GetLast().cameraMatrix = K;
-            //clouds.GetLast().ColorFromImage(tex);
-            //clouds.GetLast().Colors[12] = Color.red;
-            //clouds.GetLast().Colors[100] = Color.green;
-            //clouds.GetLast().Colors[1000] = Color.blue;
+            clouds.LoadFromPLY(name);
         }
         playing = !playing;
         pointCloudRendererGo.SetActive(playing);

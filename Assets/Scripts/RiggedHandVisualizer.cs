@@ -190,7 +190,7 @@ namespace Tutorials
         /// </summary>
         public bool RenderSkeletonJoints { get => renderSkeletonJoints; set => renderSkeletonJoints = value; }
 
-        private bool renderHandMesh = true;
+        private bool renderHandMesh = false;
 
         /// <summary>
         /// Gets or sets a value indicating whether to render hand mesh. this should be true (default) if the hands are supposed to be visible. Otherwise, it's also possible to just decativate the entire GameObject to make it disappear, which is the approach of the recording service. 

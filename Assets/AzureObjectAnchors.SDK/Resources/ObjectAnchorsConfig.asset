@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d89b8a4f81adf624a817a779ba4104a0, type: 3}
   m_Name: ObjectAnchorsConfig
   m_EditorClassIdentifier: 
-  objectAnchorsAccountId: 
-  objectAnchorsAccountKey: 
-  objectAnchorsAccountDomain: 
+  objectAnchorsAccountId: 4317d085-9467-4a05-ad33-e7d73f8c042a
+  objectAnchorsAccountKey: CfmeD490nsgEoOGa8JRKrvv4uioZzi0fNV1B30rlttk=
+  objectAnchorsAccountDomain: eastus2.mixedreality.azure.com

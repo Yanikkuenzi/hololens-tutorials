@@ -22,7 +22,7 @@ namespace Microsoft.MixedReality.Toolkit.UI
                 MixedRealityHandTrackingProfile handProfile = CoreServices.InputSystem.InputSystemProfile.HandTrackingProfile;
                 if (handProfile != null)
                 {
-                    handProfile.EnableHandMeshVisualization = handMeshButton.IsToggled;
+                    handProfile.EnableHandMeshVisualization = false;
                 }
             }
         }
