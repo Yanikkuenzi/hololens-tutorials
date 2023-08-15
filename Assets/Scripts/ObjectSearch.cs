@@ -169,7 +169,7 @@ public class ObjectSearch : MonoBehaviour
         {
             dbg = logger.GetComponent<DebugOutput>();
         }
-        dbg.Log("Starting ObjectSearch");
+        dbg.Log("Starting ObjectSearch THIS IS CHANGE111");
         try
         {
             await _objectAnchorsService.InitializeAsync();
@@ -359,20 +359,53 @@ public class ObjectSearch : MonoBehaviour
                         // A new object is tracked, show the list of tutorials that is available
                         // for it
                         string id = _event.Args.InstanceId.ToString();
-                        tutorialListManager.Show(id);
-                        recorder.SetObject(id);
-                        //recorder.SetObjecTransform(id);
-
+                        //Matrix4x4? pose = _objectAnchorsService.GetModelOriginToCenterTransform(_event.Args.InstanceId);
+                        //if(!pose.HasValue)
+                        //{
+                        //    dbg.Log("Pose not found");
+                        //}
+                        //if (!_event.Args.Location.HasValue)
+                        //{
+                        //    dbg.Log("Location unknown");
+                        //}
+                        //else
+                        //{
+                        //    Matrix4x4 pose = Matrix4x4.TRS(_event.Args.Location.Value.Position,
+                        //                                    _event.Args.Location.Value.Orientation,
+                        //                                    new Vector3(1, 1, 1)) ;
+                        //    tutorialListManager.Show(id);
+                        //    recorder.SetObject(id);
+                        //    recorder.SetObjectPose(pose);
+                        //}
                         dbg.Log($"{EventArgsFormatter(_event.Args)} \"{id}\" found, coverage {_event.Args.SurfaceCoverage.ToString("0.00")}");
                         DrawBoundingBox(_event.Args);
                         break;
                     }
                 case ObjectAnchorsServiceEventKind.Updated:
                     {
-                        dbg.Log($"{EventArgsFormatter(_event.Args)} updated, coverage {_event.Args.SurfaceCoverage.ToString("0.00")}");
-
-                        DrawBoundingBox(_event.Args);
+                        try
+                        {
+                            if (!_event.Args.Location.HasValue)
+                            {
+                                dbg.Log("Location unknown");
+                            }
+                            else
+                            {
+                                Matrix4x4 pose = Matrix4x4.TRS(_event.Args.Location.Value.Position,
+                                                                _event.Args.Location.Value.Orientation,
+                                                                new Vector3(1, 1, 1));
+                                recorder.SetObjectPose(pose);
+                                dbg.Log($"{EventArgsFormatter(_event.Args)} updated");
+                            }
+                            dbg.Log($"{EventArgsFormatter(_event.Args)} updated");
+                            DrawBoundingBox(_event.Args);
+                        }
+                        catch (Exception e)
+                        {
+                            dbg.Log(e.Message);
+                        }
                         break;
+
                     }
                 case ObjectAnchorsServiceEventKind.Removed:
                     {

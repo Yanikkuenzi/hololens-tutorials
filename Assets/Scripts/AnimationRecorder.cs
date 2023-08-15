@@ -11,6 +11,7 @@ using System.Numerics;
 using UnityEngine.Experimental.Rendering;
 using MathNet.Spatial.Euclidean;
 using MathNet.Numerics.LinearAlgebra;
+using Microsoft.MixedReality.Toolkit.Utilities;
 
 #if ENABLE_WINMD_SUPPORT
 using HL2UnityPlugin;
@@ -44,6 +45,7 @@ public class AnimationRecorder : MonoBehaviour
     private bool recording = false;
     private string trackedObjectID;
     private static System.Random random = new System.Random();
+    private UnityEngine.Matrix4x4 objectPose;
 #if ENABLE_WINMD_SUPPORT
         private MediaCapture mediaCapture;
         private LowLagPhotoCapture photoCapture;
@@ -221,7 +223,6 @@ public class AnimationRecorder : MonoBehaviour
 
     async void FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
     {
-        //dbg.Log("Frame arrived");
         try 
         {
             using (var frame = sender.TryAcquireLatestFrame())
@@ -315,7 +316,12 @@ public class AnimationRecorder : MonoBehaviour
         {
             try
             {
-                string objectName = this.trackedObjectID;
+                string objectName;
+                if (this.trackedObjectID != null)
+                    objectName = this.trackedObjectID;
+                else
+                    objectName = "New-Object";
+
                 recording = false;
 #if ENABLE_WINMD_SUPPORT
                 // Stop depth capture
@@ -337,6 +343,7 @@ public class AnimationRecorder : MonoBehaviour
         }
         else
         {
+            objectPose = UnityEngine.Matrix4x4.identity;
             recording = true;
             recordingStart = DateTime.Now;
 #if ENABLE_WINMD_SUPPORT
@@ -353,9 +360,6 @@ public class AnimationRecorder : MonoBehaviour
                 {
                     dbg.Log($"Failed to start mediaframereader!, status = {status}");
                 }
-
-                // Start depth capture
-                //researchMode.StartDepthSensorLoop(true);
                 InitResearchMode();
             }
             catch(Exception e)
@@ -369,7 +373,7 @@ public class AnimationRecorder : MonoBehaviour
 
     public static string RandomString(int length)
     {
-        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         return new string(Enumerable.Repeat(chars, length)
             .Select(s => s[random.Next(s.Length)]).ToArray());
     }
@@ -388,13 +392,13 @@ public class AnimationRecorder : MonoBehaviour
             string depthPath = $"{tutorialPath}/depth";
 
             // Make sure the directories for saving the data exists
-            if (!Directory.Exists(tutorialPath))
-            {
-                Directory.CreateDirectory(tutorialPath);
-            }
             if (!Directory.Exists(objectPath))
             {
                 Directory.CreateDirectory(objectPath);
+            }
+            if (!Directory.Exists(tutorialPath))
+            {
+                Directory.CreateDirectory(tutorialPath);
             }
             if (!Directory.Exists(rgbPath))
             {
@@ -405,17 +409,29 @@ public class AnimationRecorder : MonoBehaviour
                 Directory.CreateDirectory(depthPath);
             }
 
+            // Write object pose wrt unity coordinate system
+            using (StreamWriter writer = new StreamWriter($"{tutorialPath}/object_pose.txt"))
+            {
+                // Write pose
+                writer.WriteLine($"{objectPose[0, 0]}, {objectPose[0, 1]}, {objectPose[0, 2]}, {objectPose[0, 3]}");
+                writer.WriteLine($"{objectPose[1, 0]}, {objectPose[1, 1]}, {objectPose[1, 2]}, {objectPose[1, 3]}");
+                writer.WriteLine($"{objectPose[2, 0]}, {objectPose[2, 1]}, {objectPose[2, 2]}, {objectPose[2, 3]}");
+                writer.WriteLine($"{objectPose[3, 0]}, {objectPose[3, 1]}, {objectPose[3, 2]}, {objectPose[3, 3]}");
+            }
+
             for (int i = 0; i < colorFrames.Count; ++i)
             {
                 var frame = (ColorFrame)colorFrames[i];
                 SoftwareBitmap bmp = SoftwareBitmap.Convert((SoftwareBitmap)(frame.bitmap),
                             BitmapPixelFormat.Rgba8, BitmapAlphaMode.Straight);
 
+                Windows.Storage.StorageFolder obj = await storageFolder.GetFolderAsync(objectName);
+                Windows.Storage.StorageFolder tut = await obj.GetFolderAsync(tutorialName);
                 Windows.Storage.StorageFile file =
-                    await(await storageFolder.GetFolderAsync("rgb")).CreateFileAsync($"{i:D6}.png", Windows.Storage.CreationCollisionOption.ReplaceExisting);
+                    await(await tut.GetFolderAsync("rgb")).CreateFileAsync($"{i:D6}.png", Windows.Storage.CreationCollisionOption.ReplaceExisting);
                 SaveSoftwareBitmapToFile(bmp, file);
 
-                using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/rgb/joints_{i:D6}.txt"))
+                using (StreamWriter writer = new StreamWriter($"{rgbPath}/joints_{i:D6}.txt"))
                 {
                     // Write pose
                     foreach (var joint in frame.leftJoints)
@@ -432,7 +448,7 @@ public class AnimationRecorder : MonoBehaviour
 
                 }
 
-                using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/rgb/meta_{i:D6}.txt"))
+                using (StreamWriter writer = new StreamWriter($"{rgbPath}/meta_{i:D6}.txt"))
                 {
                     // Write time stamp to correlate rgb and depth images
                     writer.WriteLine($"{frame.timeStamp}");
@@ -460,9 +476,9 @@ public class AnimationRecorder : MonoBehaviour
                 float[] coordinates = researchMode.GetPointCloud(i, out timeStamp);
                 PointCloud pc = new PointCloud(coordinates, true);
                 float[] M = researchMode.GetDepthToWorld(i);
-                pc.ExportToPLY($"{storageFolder.Path}/depth/{i:D6}.ply");
+                pc.ExportToPLY($"{depthPath}/{i:D6}.ply");
 
-                using (StreamWriter writer = new StreamWriter($"{storageFolder.Path}/depth/meta_{i:D6}.txt"))
+                using (StreamWriter writer = new StreamWriter($"{depthPath}/meta_{i:D6}.txt"))
                 {
                     // Write time stamp to correlate rgb and depth images
                     writer.WriteLine($"{timeStamp}");
@@ -483,7 +499,7 @@ public class AnimationRecorder : MonoBehaviour
         }
         catch (Exception e)
         {
-            dbg.Log($"Error while saving images: '{e.ToString()}'");
+            dbg.Log($"Error while saving images:\n '{e.ToString()}'");
         }
 #endif
     }
@@ -492,6 +508,12 @@ public class AnimationRecorder : MonoBehaviour
     {
         this.trackedObjectID = name;
         recordingButton.SetActive(true);
+    }
+
+    public void SetObjectPose(UnityEngine.Matrix4x4 pose)
+    {
+        dbg.Log($"Pose of {name} is:\n{pose}");
+        this.objectPose = pose;
     }
 
     public void UnsetObject()
@@ -512,7 +534,6 @@ public class AnimationRecorder : MonoBehaviour
             researchMode = new HL2ResearchMode();
 
             researchMode.InitializeDepthSensor();
-            //researchMode.InitializeSpatialCamerasFront();
             researchMode.SetReferenceCoordinateSystem(unityWorldOrigin);
             researchMode.SetPointCloudDepthOffset(0);
 

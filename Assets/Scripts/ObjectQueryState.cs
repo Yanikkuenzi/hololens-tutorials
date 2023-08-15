@@ -15,6 +15,8 @@ public class ObjectQueryState : MonoBehaviour
     private MeshFilter _meshFilter;
     private DateTime? _lastMeshUpdateTime = null;
     private bool _updateInProgress = false;
+    public GameObject logger;
+    private DebugOutput dbg;
 
     private void OnDestroy()
     {
@@ -28,6 +30,11 @@ public class ObjectQueryState : MonoBehaviour
         _meshFilter = gameObject.AddComponent<MeshFilter>();
         _meshFilter.mesh = new Mesh();
         gameObject.AddComponent<MeshRenderer>().sharedMaterial = EnvironmentMaterial;
+        if (dbg == null)
+        {
+            dbg = logger.GetComponent<DebugOutput>();
+        }
+        dbg.Log("From objectquerystate");
     }
 
     // Update is called once per frame
@@ -64,6 +71,11 @@ public class ObjectQueryState : MonoBehaviour
             {
                 MeshLoader.LoadMesh(_meshFilter.mesh, meshData.Value);
                 transform.SetPositionAndRotation(observationLocation.Value.Position, observationLocation.Value.Orientation);
+                dbg.Log($"{observationLocation.Value.Position}, {observationLocation.Value.Orientation}");
+            }
+            else
+            {
+                dbg.Log("ObservatoinLocation or meshdata does not have value");
             }
 
             _lastMeshUpdateTime = DateTime.Now;

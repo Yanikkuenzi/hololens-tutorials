@@ -11,7 +11,7 @@ public class ObjectManager : MonoBehaviour
 {
     public GameObject objectManagerPanel;
     public GameObject logger;
-    public DebugOutput dbg;
+    private DebugOutput dbg;
 
     [SerializeField]
     private GameObject realObjects;
@@ -35,6 +35,7 @@ public class ObjectManager : MonoBehaviour
         {
             dbg = logger.GetComponent<DebugOutput>();
         }
+        dbg.Log("From objectmanager");
         foreach (Transform child in realObjects.transform)
         {
             child.gameObject.SetActive(false);

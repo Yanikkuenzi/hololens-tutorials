@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.Remoting.Messaging;
 using TMPro;
 using UnityEngine;
+using Microsoft.MixedReality.Toolkit.Input;
 
 #if ENABLE_WINMD_SUPPORT
 using Windows.Storage;
@@ -34,9 +35,25 @@ public class TutorialListManager : MonoBehaviour
             // TODO: remove
             baseDir = "Assets/Resources/PointClouds/"  ;
 #endif
-        panel.SetActive(false);
-    }
+        //panel.SetActive(false);
 
+        // Hide hand mesh that is shown for some reason
+        MixedRealityInputSystemProfile inputSystemProfile = Microsoft.MixedReality.Toolkit.CoreServices.InputSystem?.InputSystemProfile;
+        if (inputSystemProfile == null)
+        {
+            return;
+        }
+
+        MixedRealityHandTrackingProfile handTrackingProfile = inputSystemProfile.HandTrackingProfile;
+        if (handTrackingProfile != null)
+        {
+            handTrackingProfile.EnableHandMeshVisualization = false;
+        }
+        title.text = "Disabled hand mesh visualization";
+
+
+
+    }
     // Update is called once per frame
     void Update()
     {
@@ -106,20 +123,17 @@ public class TutorialListManager : MonoBehaviour
     public void Previous()
     {
         if (idx > 0) --idx;
-        Debug.Log("Previous pressed");
     }
 
     public void Next()
     {
         if (idx < directories.Length - 1) ++idx;
-        Debug.Log("Next pressed");
     }
 
+    // TODO: implement
     public void TogglePlaying()
     {
         //animationRenderer.TogglePointCloud("");
-        Show("CoffeBox_downsampled");
-        Debug.Log("Showing details");
     }
 
 }
