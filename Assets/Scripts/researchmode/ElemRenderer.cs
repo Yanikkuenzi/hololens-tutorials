@@ -12,7 +12,6 @@ namespace Tutorials.ResearchMode
     {
         public Mesh mesh;
 
-        // TODO: Might wanna change this to avoid weird triangular artifacts
         public void UpdateMesh(ArrayList arrVertices, int nPointsToRender, int nPointsRendered, ArrayList pointColors)
         {
             int nPoints;

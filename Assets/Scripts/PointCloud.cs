@@ -7,6 +7,7 @@ using Tutorials;
 using System.Runtime.InteropServices.ComTypes;
 using System.Net.NetworkInformation;
 using Microsoft.MixedReality.Toolkit.Input;
+using UnityEngine.Android;
 
 public class PointCloud
 {
@@ -51,7 +52,7 @@ public class PointCloud
     /// <param name="distance_threshold"></param>
     /// <exception cref="ArgumentNullException"></exception>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public PointCloud(float[] coordinates, bool build_now = false) //, double distance_threshold)
+    public PointCloud(float[] coordinates) //, double distance_threshold)
     {
         if (coordinates == null)
             throw new ArgumentNullException(nameof(coordinates));
@@ -60,15 +61,7 @@ public class PointCloud
         if (coordinates.Length == 0)
             throw new ArgumentOutOfRangeException("Point cloud must contain at least one point");
 
-        if (!build_now)
-        {
-            this.coordinates = new float[coordinates.Length];
-            Array.Copy(coordinates, this.coordinates, coordinates.Length);
-        } 
-        else
-        {
-            Build(coordinates);
-        }
+        Build(coordinates);
     }
 
     public void Build(float[] coordinates)
@@ -92,7 +85,6 @@ public class PointCloud
             //    continue;
 
             points.Add(point);
-            // TODO: change 
             colors.Add(Color.magenta);
         }
         // All of the inserted elements are valid
@@ -104,10 +96,35 @@ public class PointCloud
         Build(this.coordinates);
     }
 
-    public PointCloud(string filename)
+    public PointCloud(string filename, Matrix4x4 objectPose)
     {
+        string teachingPosePath = filename.Substring(0, filename.LastIndexOf('\\'));
         FileHandler.LoadPointsFromPLY(filename, out points, out colors);
+        Matrix4x4 axisTransform = Matrix4x4.identity;
+        axisTransform[0, 0] = axisTransform[1, 1] = 0;
+        axisTransform[1, 0] = 1;
+        axisTransform[0, 1] = 1;
+
+        Debug.Log($"reading teaching pose from{filename + "/object_pose.txt"}");
+        Matrix4x4 teachingPose = FileHandler.ReadMatrix(teachingPosePath + "/object_pose.txt");
+        // TODO: change back
+        //Transform(teachingPose.inverse);
+        //// Flip x and y coordinates for some reason
+        //Transform(axisTransform);
+        //Transform(objectPose);
         numberOfPoints = points.Count;
+    }
+
+    public void Transform(Matrix4x4 T)
+    {
+        for (int i = 0; i < points.Count; ++i)
+        {
+            //Vector3 point = (Vector3)points[i];
+            //Vector4 homogeneous = new Vector4(point.x, point.y, point.z, 1);
+            //Vector4 transformed = T * homogeneous;
+            //points[i] = (Vector3)(transformed / (1000 * transformed.w));
+            points[i] = T.MultiplyPoint((Vector3)points[i]);
+        }
     }
 
     public void ExportToPLY(string filename)

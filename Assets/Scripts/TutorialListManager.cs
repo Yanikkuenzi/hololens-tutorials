@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.IO;
@@ -6,7 +7,7 @@ using System.Linq;
 using System.Runtime.Remoting.Messaging;
 using TMPro;
 using UnityEngine;
-using Microsoft.MixedReality.Toolkit.Input;
+using UnityEngine.UIElements;
 
 #if ENABLE_WINMD_SUPPORT
 using Windows.Storage;
@@ -14,6 +15,8 @@ using Windows.Storage;
 
 public class TutorialListManager : MonoBehaviour
 {
+    public GameObject logger;
+    private DebugOutput dbg;
     public GameObject panel;
     public TextMeshPro description;
     public TextMeshPro title;
@@ -25,60 +28,65 @@ public class TutorialListManager : MonoBehaviour
     private int idx;
     private string baseDir;
     private string objectName;
+    private Matrix4x4 objectPose;
+
+    TutorialListManager() 
+    { 
+#if WINDOWS_UWP
+        StorageFolder o3d = KnownFolders.Objects3D;
+        baseDir = o3d.Path + "\\";
+#else
+        baseDir = "Assets/Resources/PointClouds/"  ;
+#endif
+    }
+
     // Start is called before the first frame update
     void Start()
     {
-    #if WINDOWS_UWP
-            StorageFolder o3d = KnownFolders.Objects3D;
-            baseDir = o3d.Path + "/";
-    #else
-            // TODO: remove
-            baseDir = "Assets/Resources/PointClouds/"  ;
-#endif
-        //panel.SetActive(false);
-
-        // Hide hand mesh that is shown for some reason
-        MixedRealityInputSystemProfile inputSystemProfile = Microsoft.MixedReality.Toolkit.CoreServices.InputSystem?.InputSystemProfile;
-        if (inputSystemProfile == null)
+        if (dbg == null)
         {
-            return;
+            dbg = logger.GetComponent<DebugOutput>();
         }
-
-        MixedRealityHandTrackingProfile handTrackingProfile = inputSystemProfile.HandTrackingProfile;
-        if (handTrackingProfile != null)
-        {
-            handTrackingProfile.EnableHandMeshVisualization = false;
-        }
-        title.text = "Disabled hand mesh visualization";
-
-
-
+        dbg.Log("Starting tutoriallistmanager");
+        panel.SetActive(false);
     }
+
     // Update is called once per frame
     void Update()
     {
-        // Don't do anything if the panel is not visible
-        if (!panel.activeSelf)
+    }
+
+    public void UpdateInfo()
+    {
+        dbg.Log("Called UpdateInfo");
+        if (directories == null)
+        {
+            dbg.Log("No object to load tutorials from");
             return;
-
-        //TODO: remove
-        if (directories == null) return;
-
-        counter.text = $"{idx + 1} / {directories.Length}";
-        title.text = ReadTitle();
-        description.text = ReadDescription();
+        }
+        try
+        {
+            counter.text = $"{idx + 1} / {directories.Length}";
+            title.text = ReadTitle();
+            description.text = ReadDescription();
+        }
+        catch (Exception e)
+        {
+            dbg.Log(e.Message);
+        }
     }
 
     private string ReadDescription()
     {
         try
         {
-            string path = $"{baseDir}{objectName}/{directories[idx]}/tutorial_info.txt";
+            if (directories.Length == 0) return "";
+            string path = $"{baseDir}{objectName}\\{directories[idx]}\\tutorial_info.txt";
             return string.Join("\n", System.IO.File.ReadLines(path).Skip(1));
         }
         catch(System.Exception e)
         {
-            Debug.Log(e.Message);
+            dbg.Log(e.Message);
             return e.Message;
         }
     }
@@ -87,33 +95,54 @@ public class TutorialListManager : MonoBehaviour
     {
         try
         {
-            string path = $"{baseDir}{objectName}/{directories[idx]}/tutorial_info.txt";
+            if (directories.Length == 0)
+                return "Object does not have tutorials associated with it";
+            string path = $"{baseDir}{objectName}\\{directories[idx]}\\tutorial_info.txt";
+            dbg.Log($"Attempting to read title from path {path}");
             return System.IO.File.ReadLines(path).First().Trim();
         }
         catch(System.Exception e)
         {
-            Debug.Log(e.Message);
+            dbg.Log(e.Message);
             return e.Message;
         }
     }
 
     public void Show(string name)
     {
+        if (name.Equals("none"))
+        {
+            panel.SetActive(true);
+            title.text = "Paper refill";
+            description.text = "This sequence shows the process of addin papar to the printer.\n" +
+                "Be aware that the tutorial refills tray 2, other trays are refilled analogously.";
+            counter.text = "2 / 3";;
+            return;
+        }
         objectName = name;
         idx = 0;
         panel.SetActive(true);
-        // Todo: change
-        title.text = name;
-
         string dir = baseDir + name;
-        Debug.Log(dir);
-        directories = Directory.GetDirectories(dir);
-        for (int i = 0; i < directories.Length; ++i)
+        dbg.Log($"Called show, searching {dir} for tutorials");
+        try
         {
-            directories[i] = directories[i]
-                            .Substring(directories[i].LastIndexOf("\\"));
-            Debug.Log(directories[i]);
+            if (!Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            directories = Directory.GetDirectories(dir);
+            dbg.Log("Available tutorial directories:\n");
+            for (int i = 0; i < directories.Length; ++i)
+            {
+                directories[i] = directories[i]
+                                .Substring(directories[i].LastIndexOf("\\"));
+                dbg.Log($"{directories[i]}\n");
+            }
         }
+        catch(Exception e)
+        {
+            dbg.Log($"Error: {e.Message}!\n");
+        }
+        UpdateInfo();
     }
     public void Hide()
     {
@@ -123,17 +152,25 @@ public class TutorialListManager : MonoBehaviour
     public void Previous()
     {
         if (idx > 0) --idx;
+        UpdateInfo();
     }
 
     public void Next()
     {
         if (idx < directories.Length - 1) ++idx;
+        UpdateInfo();
     }
 
-    // TODO: implement
+    public void SetObjectPose(Matrix4x4 pose)
+    {
+        this.objectPose = pose;
+    }
+
     public void TogglePlaying()
     {
-        //animationRenderer.TogglePointCloud("");
+        dbg.Log("Starting playback");
+        //animationRenderer.TogglePointCloud($"{objectName}\\{directories[idx]}", objectPose);
+        animationRenderer.TogglePointCloud($"{objectName}\\{directories[idx]}", Matrix4x4.identity);
     }
 
 }

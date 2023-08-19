@@ -14,6 +14,8 @@ using System.Threading.Tasks;
 using UnityEngine;
 
 using Microsoft.Azure.ObjectAnchors.Unity;
+using Microsoft.MixedReality.Toolkit.Input;
+//using UnityEditor.Experimental.GraphView;
 
 #if WINDOWS_UWP
 using Windows.Storage;
@@ -23,6 +25,8 @@ using Windows.Storage.Search;
 
 public class ObjectSearch : MonoBehaviour
 {
+    public GameObject cube;
+
     public GameObject logger;
     private DebugOutput dbg;
     public TutorialListManager tutorialListManager;
@@ -165,11 +169,28 @@ public class ObjectSearch : MonoBehaviour
 
     private async void Start()
     {
+        var start = DateTime.Now;
         if (dbg == null)
         {
             dbg = logger.GetComponent<DebugOutput>();
         }
-        dbg.Log("Starting ObjectSearch THIS IS CHANGE111");
+        dbg.Log($"Started ObjectSearch");
+        // TODO: remove
+        tutorialListManager.Show("none");
+
+        // Hide hand mesh that is shown for some reason
+        MixedRealityInputSystemProfile inputSystemProfile = Microsoft.MixedReality.Toolkit.CoreServices.InputSystem?.InputSystemProfile;
+        if (inputSystemProfile == null)
+        {
+            return;
+        }
+
+        MixedRealityHandTrackingProfile handTrackingProfile = inputSystemProfile.HandTrackingProfile;
+        if (handTrackingProfile != null)
+        {
+            handTrackingProfile.EnableHandMeshVisualization = false;
+        }
+
         try
         {
             await _objectAnchorsService.InitializeAsync();
@@ -181,18 +202,25 @@ public class ObjectSearch : MonoBehaviour
             Windows.Foundation.IAsyncOperation<Windows.UI.Popups.IUICommand> dialog = null;
             UnityEngine.WSA.Application.InvokeOnUIThread(() => dialog = new Windows.UI.Popups.MessageDialog(message, "Invalid account information").ShowAsync(), true);
             await dialog;
+
 #elif UNITY_EDITOR
             UnityEditor.EditorUtility.DisplayDialog("Invaild account information", ex.Message, "OK");
 #endif // WINDOWS_UWP
             throw ex;
         }
 
-        dbg.Log($"Object search initialized.");
+        string directory = Application.persistentDataPath;
+#if WINDOWS_UWP
+        Windows.Storage.StorageFolder storageFolder = KnownFolders.Objects3D;
+        directory = storageFolder.Path;
+#endif // WINDOWS_UWP
 
-        foreach (var file in FileHelper.GetFilesInDirectory(Application.persistentDataPath, "*.ou"))
+        dbg.Log($"Object search initialized.");
+        foreach (var file in Directory.GetFiles(Application.persistentDataPath, 
+                                                "*.ou",
+                                                SearchOption.TopDirectoryOnly).ToList())
         {
             dbg.Log($"Loading model ({Path.GetFileNameWithoutExtension(file)})");
-
             await _objectAnchorsService.AddObjectModelAsync(file.Replace('/', '\\'));
         }
 
@@ -238,6 +266,8 @@ public class ObjectSearch : MonoBehaviour
 #endif
 
         _objectQueries = InitializeObjectQueries();
+        var end = DateTime.Now;
+        dbg.Log($"Starting objectsearch took {(end - start).TotalSeconds}s");
 
         if (IsDiagnosticsCaptureEnabled)
         {
@@ -351,33 +381,33 @@ public class ObjectSearch : MonoBehaviour
             {
                 case ObjectAnchorsServiceEventKind.DetectionAttempted:
                     {
-                        dbg.Log($"detection attempted");
+                        //dbg.Log($"detection attempted");
                         break;
                     }
                 case ObjectAnchorsServiceEventKind.Added:
                     {
                         // A new object is tracked, show the list of tutorials that is available
                         // for it
-                        string id = _event.Args.InstanceId.ToString();
-                        //Matrix4x4? pose = _objectAnchorsService.GetModelOriginToCenterTransform(_event.Args.InstanceId);
-                        //if(!pose.HasValue)
-                        //{
-                        //    dbg.Log("Pose not found");
-                        //}
-                        //if (!_event.Args.Location.HasValue)
-                        //{
-                        //    dbg.Log("Location unknown");
-                        //}
-                        //else
-                        //{
-                        //    Matrix4x4 pose = Matrix4x4.TRS(_event.Args.Location.Value.Position,
-                        //                                    _event.Args.Location.Value.Orientation,
-                        //                                    new Vector3(1, 1, 1)) ;
-                        //    tutorialListManager.Show(id);
-                        //    recorder.SetObject(id);
-                        //    recorder.SetObjectPose(pose);
-                        //}
-                        dbg.Log($"{EventArgsFormatter(_event.Args)} \"{id}\" found, coverage {_event.Args.SurfaceCoverage.ToString("0.00")}");
+                        var instance = _event.Args;
+                        string id = instance.ModelId.ToString();
+                        Vector3 position = instance.Location.HasValue ? instance.Location.Value.Position : Vector3.zero;
+                        Quaternion orientation = instance.Location.HasValue ? instance.Location.Value.Orientation : Quaternion.identity;
+                        Matrix4x4 pose = Matrix4x4.TRS(position,
+                                             orientation,
+                                             new Vector3(1, 1, 1));
+                        //cube.transform.position = pose.MultiplyPoint(cube.transform.position);
+                        try
+                        {
+                            recorder.SetObject(id);
+                            recorder.SetObjectPose(pose);
+                            tutorialListManager.Show(id);
+                            tutorialListManager.SetObjectPose(pose);
+                        }
+                        catch (Exception e)
+                        {
+                            dbg.Log($"In Added: caught exception '{e.Message}'");
+                        }
+                        dbg.Log($"\"{id}\" ADDED, coverage {_event.Args.SurfaceCoverage.ToString("0.00")}");
                         DrawBoundingBox(_event.Args);
                         break;
                     }
@@ -385,20 +415,16 @@ public class ObjectSearch : MonoBehaviour
                     {
                         try
                         {
-                            if (!_event.Args.Location.HasValue)
-                            {
-                                dbg.Log("Location unknown");
-                            }
-                            else
-                            {
-                                Matrix4x4 pose = Matrix4x4.TRS(_event.Args.Location.Value.Position,
-                                                                _event.Args.Location.Value.Orientation,
-                                                                new Vector3(1, 1, 1));
-                                recorder.SetObjectPose(pose);
-                                dbg.Log($"{EventArgsFormatter(_event.Args)} updated");
-                            }
-                            dbg.Log($"{EventArgsFormatter(_event.Args)} updated");
                             DrawBoundingBox(_event.Args);
+                            var instance = _event.Args;
+                            string id = instance.ModelId.ToString();
+                            Vector3 position = instance.Location.HasValue ? instance.Location.Value.Position : Vector3.zero;
+                            Quaternion orientation = instance.Location.HasValue ? instance.Location.Value.Orientation : Quaternion.identity;
+                            Matrix4x4 pose = Matrix4x4.TRS(position,
+                                                 orientation,
+                                                 new Vector3(1, 1, 1));
+                                //recorder.SetObjectPose(pose);
+                            //dbg.Log($"{_event.Args.ModelId} updated");
                         }
                         catch (Exception e)
                         {
@@ -409,7 +435,7 @@ public class ObjectSearch : MonoBehaviour
                     }
                 case ObjectAnchorsServiceEventKind.Removed:
                     {
-                        dbg.Log($"{EventArgsFormatter(_event.Args)} removed");
+                        dbg.Log($"{_event.Args.InstanceId.ToString()} removed");
 
                         var placement = _objectPlacements[_event.Args.InstanceId];
                         _objectPlacements.Remove(_event.Args.InstanceId);

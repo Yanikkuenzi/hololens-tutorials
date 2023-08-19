@@ -332,7 +332,10 @@ public class AnimationRecorder : MonoBehaviour
                 var recordingEnd = DateTime.Now;
                 SaveRecording(objectName);
                 double seconds = (recordingEnd - recordingStart).TotalSeconds;
+                var processingEnd = DateTime.Now;
                 dbg.Log($"Done processing! Depth frame rate = {researchMode.GetPointCloudCount() / seconds}, RGB frame rate = {colorFrames.Count / seconds}");
+                dbg.Log($"Processing time: {(processingEnd - recordingEnd).TotalSeconds}s = {(processingEnd - recordingEnd).TotalMinutes}min");
+
 #endif
                 current_animation = new PointCloudCollection();
             }
@@ -343,7 +346,6 @@ public class AnimationRecorder : MonoBehaviour
         }
         else
         {
-            objectPose = UnityEngine.Matrix4x4.identity;
             recording = true;
             recordingStart = DateTime.Now;
 #if ENABLE_WINMD_SUPPORT
@@ -410,13 +412,13 @@ public class AnimationRecorder : MonoBehaviour
             }
 
             // Write object pose wrt unity coordinate system
-            using (StreamWriter writer = new StreamWriter($"{tutorialPath}/object_pose.txt"))
+            using (StreamWriter writer = new StreamWriter($"{depthPath}/object_pose.txt"))
             {
                 // Write pose
-                writer.WriteLine($"{objectPose[0, 0]}, {objectPose[0, 1]}, {objectPose[0, 2]}, {objectPose[0, 3]}");
-                writer.WriteLine($"{objectPose[1, 0]}, {objectPose[1, 1]}, {objectPose[1, 2]}, {objectPose[1, 3]}");
-                writer.WriteLine($"{objectPose[2, 0]}, {objectPose[2, 1]}, {objectPose[2, 2]}, {objectPose[2, 3]}");
-                writer.WriteLine($"{objectPose[3, 0]}, {objectPose[3, 1]}, {objectPose[3, 2]}, {objectPose[3, 3]}");
+                writer.WriteLine($"{objectPose[0, 0]} {objectPose[0, 1]} {objectPose[0, 2]} {objectPose[0, 3]}");
+                writer.WriteLine($"{objectPose[1, 0]} {objectPose[1, 1]} {objectPose[1, 2]} {objectPose[1, 3]}");
+                writer.WriteLine($"{objectPose[2, 0]} {objectPose[2, 1]} {objectPose[2, 2]} {objectPose[2, 3]}");
+                writer.WriteLine($"{objectPose[3, 0]} {objectPose[3, 1]} {objectPose[3, 2]} {objectPose[3, 3]}");
             }
 
             for (int i = 0; i < colorFrames.Count; ++i)
@@ -474,7 +476,7 @@ public class AnimationRecorder : MonoBehaviour
             {
                 long timeStamp = 0;
                 float[] coordinates = researchMode.GetPointCloud(i, out timeStamp);
-                PointCloud pc = new PointCloud(coordinates, true);
+                PointCloud pc = new PointCloud(coordinates);
                 float[] M = researchMode.GetDepthToWorld(i);
                 pc.ExportToPLY($"{depthPath}/{i:D6}.ply");
 
@@ -506,14 +508,34 @@ public class AnimationRecorder : MonoBehaviour
 
     public void SetObject(string name)
     {
-        this.trackedObjectID = name;
-        recordingButton.SetActive(true);
+        // Don't set other object while recording
+        try
+        {
+            dbg.Log($"Trying to set object");
+            if (recording)
+            {
+                dbg.Log("Currently recording, setting object anyway");
+            }
+            dbg.Log($"Set object to {name}");
+            this.trackedObjectID = name;
+            recordingButton.SetActive(true);
+        }
+        catch (Exception e)
+        {
+            dbg.Log($"Caught exception in 'SetObject': {e.Message}");
+        }
     }
 
     public void SetObjectPose(UnityEngine.Matrix4x4 pose)
     {
-        dbg.Log($"Pose of {name} is:\n{pose}");
-        this.objectPose = pose;
+        try
+        {
+            this.objectPose = pose;
+            dbg.Log($"Pose of {this.trackedObjectID} is:\n{pose}");
+        } catch (Exception e)
+        {
+            dbg.Log($"Caught exception in 'SetObjectPose': {e.Message}");
+        }
     }
 
     public void UnsetObject()

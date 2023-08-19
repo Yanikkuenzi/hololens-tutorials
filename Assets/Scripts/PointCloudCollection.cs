@@ -72,8 +72,7 @@ public class PointCloudCollection : MonoBehaviour
         return this.Get(clouds.Count - 1);
     }
 
-
-    public bool LoadFromPLY(string directory)
+    public bool LoadFromPLY(string directory, Matrix4x4 objectPose)
     {
         string[] filenames = null;
         try
@@ -93,7 +92,7 @@ public class PointCloudCollection : MonoBehaviour
             return false;
         }
 
-        int n = Math.Min(filenames.Length, 2);
+        int n = Math.Min(filenames.Length, 3);
         //int n = filenames.Length;
         Debug.Log(string.Format("Loading {0} ply files", n));
 
@@ -106,7 +105,7 @@ public class PointCloudCollection : MonoBehaviour
         // Load all the point clouds belonging to the animation
         for (int i = 0; i < n; i++)
         {
-            this.clouds.Add(new PointCloud(filenames[i]));
+            this.clouds.Add(new PointCloud(filenames[i], objectPose));
         }
         Debug.Log("Loaded all files");
 

@@ -49,26 +49,6 @@ namespace Tutorials.ResearchMode
                 nChunks = 0;
                 return;
             }
-
-            //for(int i = 0; i < elems.Count; ++i)
-            //{
-            //    GameObject.Destroy(elems[i]);
-            //}
-
-            //for (int i = 0; i < arrVertices.Count; i++)
-            //{
-            //    GameObject newElem = GameObject.Instantiate(pointCloudElem);
-            //    newElem.transform.parent = transform;
-            //    newElem.transform.localPosition = (Vector3)arrVertices[i];
-            //    newElem.transform.localRotation = Quaternion.identity;
-            //    //newElem.transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
-            //    newElem.GetComponent<Renderer>().material.SetColor("_Color", (Color)pointColors[i]);
-            //    elems.Add(newElem);
-
-            //}
-            //Debug.Log($"Created {arrVertices.Count} cubes for the point cloud");
-
-            // Previous
             else
             {
                 nPoints = arrVertices.Count;
@@ -150,7 +130,6 @@ namespace Tutorials.ResearchMode
 
         public Mesh GetPointCloudMesh()
         {
-            // TODO: Fix whatever this index is so I know which mesh to return
             ElemRenderer renderer = elems[0].GetComponent<ElemRenderer>();
             return renderer.mesh;
 

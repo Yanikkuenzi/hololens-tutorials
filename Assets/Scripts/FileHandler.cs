@@ -361,8 +361,22 @@ namespace Tutorials
             return (new Vector3(x, y, z), color);
         }
 
+        public static Matrix4x4 ReadMatrix(string path)
+        {
+            Matrix4x4 result = new Matrix4x4();
+            int row = 0;
+            foreach(string line in System.IO.File.ReadLines(path))
+            {
+                string[] elements = line.Split(' ');
+                result[row, 0] = float.Parse(elements[0]);
+                result[row, 1] = float.Parse(elements[1]);
+                result[row, 2] = float.Parse(elements[2]);
+                result[row, 3] = float.Parse(elements[3]);
+                row++;
+            }
+            return result;
+        }
 
     }
-
 
 }
