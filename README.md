@@ -1,68 +1,33 @@
 # 4D Holographic Tutorials
 
 ### Abstract
-In recent years, augmented and virtual reality devices experienced significant improvements in usability and processing power, directly leading to increased usage in industrial settings. In this paper, we present a novel application to enable diverse users to create 4D Holographic Tutorials for the HoloLens 2. To the author's best knowledge, no previous work exists trying to achieve a similar result. We focused on providing an easy to use user-interface, which allows users to create and watch tutorials step-by-step. Not only does it allow creating tutorials for specific locations, but it also provides the functionality to use the same tutorial for new locations. We describe the design of core features and publish the code as open-source software. To show the prevalent usability, a user study qualitatively measures the user experience. Given the broad domain of potential applications and research avenues, we lay a foundation for future work to create applications of this technology to diverse training scenarios.
+Learning tasks that involve hand-object manipulation using traditional
+methods, such as learning from written manuals or YouTube tutorials,
+can be challenging due to the importance of spatial information. Aug-
+mented Reality applications like Microsoft Dynamics 365 Guides have
+become increasingly popular because they provide information in 3D,
+which can reduce errors and learning time. However, creating step-by-
+step instructions in 3D can be time-consuming, especially when experts
+need to interact with objects using tools. Some recent approaches have
+attempted to address this challenge by capturing hand poses during
+authoring sessions. However, this method is not scalable as it cannot
+capture manipulated objects that are not trackable. To address this
+issue, we propose capturing 3D tutorial videos in the form of 3D point
+clouds with the 3D pose relative to the target object using mixed reality
+devices like HoloLens 2. These point clouds can then be shown to
+users as 3D animations. To achieve our proposed method of capturing
+3D tutorial videos, we utilize Azure Object Anchor to estimate the 6D
+pose of the target object. We also employ segmentation-based methods
+to detect and remove irrelevant information, such as the background.
+This combination of techniques allows for more accurate and effective
+capture of 3D point clouds with the necessary spatial information
 
-Research semester project as part of 3D Vision lecture at ETH Zurich, 
-Spring 2022  
-https://www.cvg.ethz.ch/teaching/3dvision/ 
+Bachelor Thesis, Spring 2023  
 
-Nicolas Wicki  
-Benjamin Hardin  
-Lukas Walker  
-Andrin Bertschi  
-
-### Impressions
-Video Playlist: https://www.youtube.com/playlist?list=PL9ljg0RPLMToyLbPvqVUjwlWdnGND72LN
-
-<a href="https://www.youtube.com/playlist?list=PL9ljg0RPLMToyLbPvqVUjwlWdnGND72LN">
-<p align="">
-    <img src="https://user-images.githubusercontent.com/2311941/173391780-a71b4cdb-2424-43b2-94c7-88adbf715bb3.png" alt="design" width="500"/>
-</p>
-</a>
-
-<p align="">
-    <img src="https://user-images.githubusercontent.com/2311941/173393117-ee452d04-7036-42cb-8e42-98f8d6ed74b4.png" alt="design" width="500"/>
-</p>
-<p align="">
-    <img src="https://user-images.githubusercontent.com/2311941/173393182-5babfe24-5ff0-4018-bd91-25ccce06f77a.png" alt="design" width="500"/>
-</p>
-
-<p align="">
-    <img src="https://user-images.githubusercontent.com/2311941/173393240-0f3cc725-edbe-49e5-93ab-379b24478c3a.png" alt="design" width="500"/>
-</p>
+Yanik Künzi
 
 
-
-### Getting started
-See [INSTALL file](INSTALL.md)
-
-### Used packages
- * MixedReality/com.microsoft.mixedreality.toolkit.examples-2.7.3.tgz
- * MixedReality/com.microsoft.mixedreality.toolkit.extensions-2.7.3.tgz
- * MixedReality/com.microsoft.mixedreality.toolkit.foundation-2.7.3.tgz
- * MixedReality/com.microsoft.mixedreality.toolkit.standardassets-2.7.3.tgz
- * MixedReality/com.microsoft.mixedreality.toolkit.testutilities-2.7.3.tgz
- * MixedReality/com.microsoft.mixedreality.toolkit.tools-2.7.3.tgz
- * All Mixed Reality packages above are available through the Mixed Reality Feature Tool [Link](https://docs.microsoft.com/en-gb/windows/mixed-reality/develop/unity/welcome-to-mr-feature-tool)
- * For a more extensive list of packages used, see [here](Packages/manifest.json)
-
-### Relevant Scripts Written
- * [Recording](Assets/Scripts/Recorder.cs)
- * [Buffer for Recording](Assets/Scripts/InputRecordingBuffer.cs)
- * [Playback](Assets/Scripts/Player.cs)
- * [Hand Playback](Assets/Scripts/RiggedHandVisualizer.cs)
- * [User Input](Assets/Scripts/InputHandler.cs)
- * [Object Management](Assets/Scripts/ObjectManager.cs)
- * [Point Cloud Management](Assets/Scripts/researchmode)
- * [Location Invariance QR Code](Assets/Scripts/QRCode)
- * [Animation Management](Assets/Scripts/AnimationList.cs)
- * [Animation Management](Assets/Scripts/AnimationWrapper.cs)
- * [Animation Management](Assets/Scripts/InputAnimation.cs)
- * [Countdown](Assets/Scripts/CountdownHandler.cs)
- * [User Interface](Assets/Scripts/FeaturesPanelVisuals.cs)
- * [User Interface](Assets/Scripts/ScrollablePagination.cs)
- * [User Interface](Assets/Scripts/SceneManagerPanel.cs)
- * [User Interface](Assets/Scripts/StepNameHandler.cs)
- * [User Interface](Assets/Scripts/UpdateObjectName.cs)
-
+### Usage
+To play back a tutorial, make sure to do follow the following steps:
+* Make sure the 3D model of the objects you are working with are present in the `3D Objects` directory on the HoloLens
+* As soon as an object is recognized, a new window appears allowing the user to select and play back tutorial
