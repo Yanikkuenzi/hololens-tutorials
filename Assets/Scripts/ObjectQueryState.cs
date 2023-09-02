@@ -34,7 +34,7 @@ public class ObjectQueryState : MonoBehaviour
         {
             dbg = logger.GetComponent<DebugOutput>();
         }
-        dbg.Log("From objectquerystate");
+        Debug.Log("From objectquerystate");
     }
 
     // Update is called once per frame

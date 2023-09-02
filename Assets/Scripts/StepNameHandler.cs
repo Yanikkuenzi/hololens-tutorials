@@ -10,8 +10,6 @@ namespace Tutorials
         [SerializeField]
         private GameObject sceneNameEditor;
         [SerializeField]
-        private Recorder recorder;
-        [SerializeField]
         public TMP_InputField stepNameInputField;
 
         // Start is called before the first frame update
@@ -36,8 +34,6 @@ namespace Tutorials
                 stepNameInputField.text = stepNameInputField.text.Trim();
                 if (stepNameInputField.text != string.Empty)
                 {
-                    // Save the name to the animation file instance
-                    recorder.NameCurrentAnimation(stepNameInputField.text);
                     stepNameInputField.text = "";
                 }
                 sceneNameEditor.SetActive(false);

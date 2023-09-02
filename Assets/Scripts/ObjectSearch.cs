@@ -25,8 +25,6 @@ using Windows.Storage.Search;
 
 public class ObjectSearch : MonoBehaviour
 {
-    public GameObject cube;
-
     public GameObject logger;
     private DebugOutput dbg;
     public TutorialListManager tutorialListManager;
@@ -174,9 +172,7 @@ public class ObjectSearch : MonoBehaviour
         {
             dbg = logger.GetComponent<DebugOutput>();
         }
-        dbg.Log($"Started ObjectSearch");
-        // TODO: remove
-        tutorialListManager.Show("none");
+        dbg.Log($"Started ObjectSearch NEW");
 
         // Hide hand mesh that is shown for some reason
         MixedRealityInputSystemProfile inputSystemProfile = Microsoft.MixedReality.Toolkit.CoreServices.InputSystem?.InputSystemProfile;
@@ -216,7 +212,7 @@ public class ObjectSearch : MonoBehaviour
 #endif // WINDOWS_UWP
 
         dbg.Log($"Object search initialized.");
-        foreach (var file in Directory.GetFiles(Application.persistentDataPath, 
+        foreach (var file in Directory.GetFiles(Application.persistentDataPath,
                                                 "*.ou",
                                                 SearchOption.TopDirectoryOnly).ToList())
         {
@@ -408,14 +404,14 @@ public class ObjectSearch : MonoBehaviour
                             dbg.Log($"In Added: caught exception '{e.Message}'");
                         }
                         dbg.Log($"\"{id}\" ADDED, coverage {_event.Args.SurfaceCoverage.ToString("0.00")}");
-                        DrawBoundingBox(_event.Args);
+                        //DrawBoundingBox(_event.Args);
                         break;
                     }
                 case ObjectAnchorsServiceEventKind.Updated:
                     {
                         try
                         {
-                            DrawBoundingBox(_event.Args);
+                            //DrawBoundingBox(_event.Args);
                             var instance = _event.Args;
                             string id = instance.ModelId.ToString();
                             Vector3 position = instance.Location.HasValue ? instance.Location.Value.Position : Vector3.zero;

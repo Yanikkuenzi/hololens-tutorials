@@ -25,7 +25,7 @@ public class DebugOutput : MonoBehaviour
     {
         if (!changed) return;
         output.text = "";
-        foreach((DateTime timestamp, string msg) in logs)
+        foreach ((DateTime timestamp, string msg) in logs)
         {
             output.text += string.Format("[{0}] ", timestamp.ToString("HH:mm:ss"));
             output.text += msg + "\n";

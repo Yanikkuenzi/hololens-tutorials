@@ -8,6 +8,7 @@ using System.Runtime.InteropServices.ComTypes;
 using System.Net.NetworkInformation;
 using Microsoft.MixedReality.Toolkit.Input;
 using UnityEngine.Android;
+using System.Data.Common;
 
 public class PointCloud
 {
@@ -61,11 +62,6 @@ public class PointCloud
         if (coordinates.Length == 0)
             throw new ArgumentOutOfRangeException("Point cloud must contain at least one point");
 
-        Build(coordinates);
-    }
-
-    public void Build(float[] coordinates)
-    {
         int nPoints = coordinates.Length / 3;
         // Square distance threshold to compare it to squared magnitude later,
         // saves some square root computations
@@ -91,38 +87,39 @@ public class PointCloud
         numberOfPoints = points.Count;
     }
 
-    public void Build()
+    public PointCloud(ArrayList points, ArrayList colors, Matrix4x4 objectPose, Matrix4x4 teachingPose_inv)
     {
-        Build(this.coordinates);
+        Debug.Log("In point cloud constructor");
+        this.points = points;
+        this.colors = colors;
+
+        Transform(teachingPose_inv);
+        Transform(objectPose);
+        numberOfPoints = points.Count;
     }
 
-    public PointCloud(string filename, Matrix4x4 objectPose)
+    public PointCloud(string filename, Matrix4x4 objectPose, Matrix4x4 teachingPose_inv)
     {
-        string teachingPosePath = filename.Substring(0, filename.LastIndexOf('\\'));
+        var start = DateTime.Now;
         FileHandler.LoadPointsFromPLY(filename, out points, out colors);
         Matrix4x4 axisTransform = Matrix4x4.identity;
         axisTransform[0, 0] = axisTransform[1, 1] = 0;
         axisTransform[1, 0] = 1;
         axisTransform[0, 1] = 1;
 
-        Debug.Log($"reading teaching pose from{filename + "/object_pose.txt"}");
-        Matrix4x4 teachingPose = FileHandler.ReadMatrix(teachingPosePath + "/object_pose.txt");
-        // TODO: change back
-        //Transform(teachingPose.inverse);
-        //// Flip x and y coordinates for some reason
+        Transform(teachingPose_inv);
+        // Flip x and y coordinates for some reason
         //Transform(axisTransform);
-        //Transform(objectPose);
+        Transform(objectPose);
         numberOfPoints = points.Count;
+        var end = DateTime.Now;
+        Debug.Log($"Loading and transforming {filename} took {(end - start).TotalSeconds}, size of ");
     }
 
     public void Transform(Matrix4x4 T)
     {
         for (int i = 0; i < points.Count; ++i)
         {
-            //Vector3 point = (Vector3)points[i];
-            //Vector4 homogeneous = new Vector4(point.x, point.y, point.z, 1);
-            //Vector4 transformed = T * homogeneous;
-            //points[i] = (Vector3)(transformed / (1000 * transformed.w));
             points[i] = T.MultiplyPoint((Vector3)points[i]);
         }
     }
@@ -171,29 +168,29 @@ public class PointCloud
     /// If expected_points >= number_of_points, nothing will be done
     /// </summary>
     /// <param name="expected_points"></param>
-    public void RandomDownSample(int expected_points)
-    {
-        // Initialize random number generator
-        System.Random rnd = new System.Random();
-        // Don't downsample if there are fewer points than what is expected
-        if (expected_points >= numberOfPoints)
-            return;
+    //public void RandomDownSample(int expected_points)
+    //{
+    //    // Initialize random number generator
+    //    System.Random rnd = new System.Random();
+    //    // Don't downsample if there are fewer points than what is expected
+    //    if (expected_points >= numberOfPoints)
+    //        return;
 
-        // Probability of element being included in the downsampled point cloud
-        double p = (double)expected_points / numberOfPoints;
-        // Index of first element not belonging to downsampled array anymore
-        int n = 0;
-        for (int i = 0; i < numberOfPoints; i++)
-        {
-            // Keep element, copy it in region that contains valid points
-            if (rnd.NextDouble() < p)
-            {
-                points[n] = points[i];
-                colors[n++] = colors[i];
-            }
-        }
-        numberOfPoints = n;
-    }
+    //    // Probability of element being included in the downsampled point cloud
+    //    double p = (double)expected_points / numberOfPoints;
+    //    // Index of first element not belonging to downsampled array anymore
+    //    int n = 0;
+    //    for (int i = 0; i < numberOfPoints; i++)
+    //    {
+    //        // Keep element, copy it in region that contains valid points
+    //        if (rnd.NextDouble() < p)
+    //        {
+    //            points[n] = points[i];
+    //            colors[n++] = colors[i];
+    //        }
+    //    }
+    //    numberOfPoints = n;
+    //}
 
 
     /// <summary>
@@ -240,46 +237,45 @@ public class PointCloud
     //}
 
 
+    //public void ColorFromImage(Texture2D texture)
+    //{
+    //    // Ignore previous color information
+    //    colors.Clear();
+    //    float x_offset = cameraMatrix[0, 2];
+    //    float y_offset = cameraMatrix[1, 2];
+    //    //float x_offset = 0;
+    //    //float y_offset = 0;
 
-    public void ColorFromImage(Texture2D texture)
-    {
-        // Ignore previous color information
-        colors.Clear();
-        float x_offset = cameraMatrix[0, 2];
-        float y_offset = cameraMatrix[1, 2];
-        //float x_offset = 0;
-        //float y_offset = 0;
+    //    foreach (Vector3 point in points)
+    //    {
+    //        // Convert 3d point in world coordinates to homogeneous point
+    //        Vector4 homogeneous_point = point;
+    //        homogeneous_point.w = 1;
+    //        // Project to image plane (https://en.wikipedia.org/wiki/Camera_resectioning)
+    //        // projected = z * [u, v, 1]^T = M * [x, y, z, 1]^T
+    //        Vector3 projected = cameraMatrix * homogeneous_point;
 
-        foreach (Vector3 point in points)
-        {
-            // Convert 3d point in world coordinates to homogeneous point
-            Vector4 homogeneous_point = point;
-            homogeneous_point.w = 1;
-            // Project to image plane (https://en.wikipedia.org/wiki/Camera_resectioning)
-            // projected = z * [u, v, 1]^T = M * [x, y, z, 1]^T
-            Vector3 projected = cameraMatrix * homogeneous_point;
+    //        // Convert to homogeneous coordinates, z coordinate must be 1
+    //        projected /= projected.z;
 
-            // Convert to homogeneous coordinates, z coordinate must be 1
-            projected /= projected.z;
+    //        // Translate to have the center at the correct place
+    //        projected.x += x_offset;
+    //        projected.y += y_offset;
 
-            // Translate to have the center at the correct place
-            projected.x += x_offset;
-            projected.y += y_offset;
+    //        // Normalize and flip along the y axis
+    //        float u = projected.x / texture.width;
+    //        float v = 1 - (projected.y / texture.height);
 
-            // Normalize and flip along the y axis
-            float u = projected.x / texture.width;
-            float v = 1 - (projected.y / texture.height);
-
-            // Assign the current point the right color corresponding to its projection onto
-            // the image plane
-            if (u >= texture.width || u < 0 || v >= texture.height || v < 0)
-            {
-                colors.Add(Color.clear);
-            }
-            else
-            {
-                colors.Add(texture.GetPixelBilinear(u, v));
-            }
-        }
-    }
+    //        // Assign the current point the right color corresponding to its projection onto
+    //        // the image plane
+    //        if (u >= texture.width || u < 0 || v >= texture.height || v < 0)
+    //        {
+    //            colors.Add(Color.clear);
+    //        }
+    //        else
+    //        {
+    //            colors.Add(texture.GetPixelBilinear(u, v));
+    //        }
+    //    }
+    //}
 }

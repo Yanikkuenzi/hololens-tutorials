@@ -31,11 +31,6 @@ namespace Tutorials
         private float localTime = 0.0f;
 
         /// <summary>
-        /// Contains meta data 
-        /// </summary>
-        private AnimationWrapper animationWrapper;
-
-        /// <summary>
         /// The actual animation that is being replayed 
         /// </summary>
         private new InputAnimation animation;
@@ -125,23 +120,6 @@ namespace Tutorials
         /// </summary>
         public void Play()
         {
-            if (animation == null)
-            {
-                animationSpecificPointOfReference.localPosition = Vector3.zero;
-                animationSpecificPointOfReference.localRotation = Quaternion.identity;
-                Stop();
-                return;
-            }
-
-            Duration = animation.Duration;
-
-            // the animation specific point of reference is moved according to the stored position and rotation in the animation entity
-            animationSpecificPointOfReference.localPosition = new Vector3((float)animationWrapper.position_x, (float)animationWrapper.position_y, (float)animationWrapper.position_z);
-            animationSpecificPointOfReference.localRotation = new Quaternion((float)animationWrapper.rotation_x, (float)animationWrapper.rotation_y, (float)animationWrapper.rotation_z, (float)animationWrapper.rotation_w);
-
-            localTime = 0.0f;
-
-            isPlaying = true;
         }
 
         /// <summary>
@@ -216,38 +194,6 @@ namespace Tutorials
                 
             }
         }
-        /// <summary>
-        /// Plays the specified animation wrapper (assuming the animation data is available).
-        /// If animationWrapper is null, this method will stop the playback. 
-        /// </summary>
-        /// <param name="animationWrapper">The animation wrapper.</param>
-        public void Play(AnimationWrapper animationWrapper)
-        {
-            if (animationWrapper == null)
-            {
-                animationSpecificPointOfReference.localPosition = Vector3.zero;
-                animationSpecificPointOfReference.localRotation = Quaternion.identity;
-                Stop();
-                return;
-            }
-
-            this.animationWrapper = animationWrapper;
-            animation = animationWrapper.Animation;
-            // Get all objects from the animation and make them available
-            objectManager.DeactivateRealObjects();
-            InstantiateObjects();
-
-            Play();
-        }
-
-        /// <summary>
-        /// Plays the current animation from the animation list instance. If there is no currently loaded animation entity, this will call Play(null)
-        /// </summary>
-        public void PlayCurrent()
-        {
-            Play(FileHandler.AnimationListInstance.GetCurrentAnimationWrapper());
-        }
-
 
         /// <summary>
         /// Stops the playback
@@ -266,31 +212,6 @@ namespace Tutorials
 
         public void Update()
         {
-            if (isPlaying)
-            {
-                // local time is updated according to the fps delta time, taking the speed into accound. 
-                localTime += Time.deltaTime * (float)(animationWrapper.Speed);
-
-
-                // if the local time is before the start frame, the local time is set to the time of the first frame (i.e. to the selected beginning of the animation)
-                if (localTime < Duration * (float)animationWrapper.StartFrame)
-                {
-                    localTime = Duration * (float)animationWrapper.StartFrame;
-                }
-
-                // if local time is before the last frame, the current hand pose is evaluated at localTime and the status bars of both hands are updated
-                if (localTime < Duration * (float)animationWrapper.EndFrame && !startAgain)
-                {
-                    Evaluate();
-                }
-                // when local time reaches the end of the animation, it is reset to the time of the first frame. 
-                // in study mode, pausing is activated after each iteration, s.t. each animation is only played once. 
-                else
-                {
-                    localTime = Duration * (float)animationWrapper.StartFrame;
-                    startAgain = false;
-                }
-            }
         }
 
         /// Evaluate the animation at localTime
@@ -310,20 +231,6 @@ namespace Tutorials
             // otherwise, only the hands that are supposed to be visible are set to visible state. 
             else
             {
-                if (!animationWrapper.LeftHand)
-                {
-                    riggedHandLeft.gameObject.SetActive(false);
-                }
-                else riggedHandLeft.gameObject.SetActive(true);
-                if (!animationWrapper.RightHand)
-                {
-                    riggedHandRight.gameObject.SetActive(false);
-                }
-                else riggedHandRight.gameObject.SetActive(true);
-                foreach(var obj in objectList)
-                {
-                    obj.SetActive(true);
-                }
             }
 
             if (animation == null)
@@ -337,8 +244,6 @@ namespace Tutorials
             // evaluate hand poses
             if (animation.HasHandData)
             {
-                if (animationWrapper.LeftHand) EvaluateHandData(Handedness.Left);
-                if (animationWrapper.RightHand) EvaluateHandData(Handedness.Right);
             }
 
             EvaluateObjectData();

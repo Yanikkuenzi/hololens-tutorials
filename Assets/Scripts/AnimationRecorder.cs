@@ -9,8 +9,6 @@ using UnityEngine;
 using UnityEngine.Windows.WebCam;
 using System.Numerics;
 using UnityEngine.Experimental.Rendering;
-using MathNet.Spatial.Euclidean;
-using MathNet.Numerics.LinearAlgebra;
 using Microsoft.MixedReality.Toolkit.Utilities;
 
 #if ENABLE_WINMD_SUPPORT
@@ -491,9 +489,22 @@ public class AnimationRecorder : MonoBehaviour
                     writer.WriteLine($"{M[8]}, {M[9]}, {M[10]}, {M[11]}");
                     writer.WriteLine($"{M[12]}, {M[13]}, {M[14]}, {M[15]}");
                 }
-
                 dbg.Log($"Processed point cloud {i + 1}");
 
+                //// TODO: remove again
+                //Texture2D tex = new Texture2D(512, 512);
+                //ushort[] depthImg = researchMode.GetDepthImage(i);
+                //Debug.Log($"Length of array: {depthImg.Length}");
+                //Debug.Log($"depthImg[200] = {depthImg[200]}");
+                //Debug.Log($"depthImg[400] = {depthImg[400]}");
+                //for(int j = 0; j < 512 * 512; ++j) 
+                //{
+                //    float val = depthImg[j] > 4090 ? 0 : ((float)depthImg[j]) / 4090f;
+                //    tex.SetPixel(j / 512, j % 512, new Color(val, val, val));
+                //}
+                //tex.Apply();
+                //byte[] bytes = ImageConversion.EncodeToPNG(tex);
+                //File.WriteAllBytes($"{depthPath}/depth_image_{i}.png", bytes);
             }
 
             // Reset frames and mapping
@@ -502,6 +513,7 @@ public class AnimationRecorder : MonoBehaviour
         catch (Exception e)
         {
             dbg.Log($"Error while saving images:\n '{e.ToString()}'");
+            Debug.Log($"Error while saving images:\n '{e.ToString()}'");
         }
 #endif
     }

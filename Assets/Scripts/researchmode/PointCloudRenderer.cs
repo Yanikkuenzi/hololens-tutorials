@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
+using Microsoft.MixedReality.Toolkit.Input;
 
 namespace Tutorials.ResearchMode
 {
@@ -11,7 +12,8 @@ namespace Tutorials.ResearchMode
     public class PointCloudRenderer : MonoBehaviour
     {
         public int maxChunkSize = 65535;
-        public float pointSize = .0015f;
+        //public float pointSize = .0015f;
+        public float pointSize = 1.5f;
         public GameObject pointCloudElem;
         public Material pointCloudMaterial;
 
@@ -25,7 +27,7 @@ namespace Tutorials.ResearchMode
 
         void Update()
         {
-            pointSize = .0015f;
+            //pointSize = .0015f;
             if (transform.hasChanged)
             {
                 UpdatePointSize();
@@ -40,7 +42,7 @@ namespace Tutorials.ResearchMode
 
         public void Render(ArrayList arrVertices, ArrayList pointColors)
         {
-            pointSize = .0015f;
+            //pointSize = .0015f;
             int nPoints, nChunks;
 
             if (arrVertices == null)
@@ -109,7 +111,7 @@ namespace Tutorials.ResearchMode
                     allPoints[counter] = renderer.mesh.vertices[j];
                     counter++;
                 }
-                
+
             }
 
             return allPoints;

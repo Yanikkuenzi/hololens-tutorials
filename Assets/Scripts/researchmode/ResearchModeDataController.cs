@@ -94,11 +94,10 @@ namespace Tutorials.ResearchMode
 
         void LateUpdate()
         {
-            SendPing();
-            // if (_renderLoadedPointCloud ) 
-            //     UpdatePointCloud();
+            if (_renderLoadedPointCloud)
+                UpdatePointCloud();
             //if (_capturePointCloud)
-                //CapturePointCloud();
+            //    CapturePointCloud();
         }
 
         private void InitResearchMode()
@@ -303,7 +302,6 @@ namespace Tutorials.ResearchMode
 
             Mesh newMesh = new Mesh();
             // Calcualte new mesh vertices from a convex hull
-            var calc = new ConvexHullCalculator();
             var verts = new List<Vector3>();
             var tris = new List<int>();
             var normals = new List<Vector3>();
@@ -314,16 +312,6 @@ namespace Tutorials.ResearchMode
                 Destroy(convexHullObject);
             }
 
-            try
-            {
-                calc.GenerateHull(pointCloudPoints, false, ref verts, ref tris, ref normals);
-            } catch (Exception)
-            {
-                Debug.Log("Error capturing points to use for the mesh. Are you capturing more than 4 co-planar points?");
-                return;
-            }
-
-            
             newMesh.SetVertices(verts);
             newMesh.SetTriangles(tris, 0);
             newMesh.SetNormals(normals);

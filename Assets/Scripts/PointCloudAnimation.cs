@@ -11,22 +11,21 @@ using System.Diagnostics.PerformanceData;
 #if WINDOWS_UWP
 using Windows.Storage;
 using System.Threading.Tasks;
+using Windows.Storage;
 #endif
 
 public class PointCloudAnimation : MonoBehaviour
 {
-    private PointCloudCollection clouds;
+    private Dictionary<string, PointCloudCollection> clouds = new Dictionary<string, PointCloudCollection>();
 
     private int current_idx = 0;
-    private int nFramesPerCloud = 10;
+    private int nFramesPerCloud = 5;
     private int nFramesShown = 0;
 
     public bool repeat = true;
     private bool playing = false;
     private string currentPointCloudName = "";
 
-    public GameObject cube_record;
-    public GameObject cube_play;
     public GameObject pointCloudRendererGo;
     private PointCloudRenderer pointCloudRenderer;
 
@@ -37,7 +36,7 @@ public class PointCloudAnimation : MonoBehaviour
     void Start()
     {
         pointCloudRenderer = pointCloudRendererGo.GetComponent<PointCloudRenderer>();
-        pointCloudRendererGo.SetActive(playing);
+        pointCloudRendererGo.SetActive(true);
         if (dbg == null)
         {
             dbg = logger.GetComponent<DebugOutput>();
@@ -47,44 +46,50 @@ public class PointCloudAnimation : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (!playing) return;
-
-        // Don't update anything
-        if (nFramesShown != nFramesPerCloud)
+        try
         {
-            nFramesShown++;
-            return;
+            if (!playing) return;
+            // Don't update anything
+            if (nFramesShown != nFramesPerCloud)
+            {
+                nFramesShown++;
+                return;
+            }
+
+            // Reset counter
+            nFramesShown = 0;
+
+            // Render point cloud
+            PointCloud current = clouds[currentPointCloudName].Get(current_idx);
+            dbg.Log($"Current cloud {current_idx} contains {current.Count} points");
+            pointCloudRenderer.Render(current.Points, current.Colors);
+
+            // Increment frame and wrap around if end is reached
+            current_idx = (current_idx + 1) % clouds[currentPointCloudName].Count;
+            // If last frame was played and repeat is not set, set playing to false
+            playing = (current_idx > 0) || repeat;
+
         }
-
-        // Reset counter
-        nFramesShown = 0;
-
-        // Render point cloud
-        PointCloud current = clouds.Get(current_idx);
-        dbg.Log($"Current cloud {current_idx} contains {current.Count} points");
-        pointCloudRenderer.Render(current.Points, current.Colors);
-
-        // Increment frame and wrap around if end is reached
-        current_idx = (current_idx + 1) % clouds.Count;
-        // If last frame was played and repeat is not set, set playing to false
-        playing = (current_idx > 0) || repeat;
+        catch (Exception e)
+        {
+            Debug.Log($"Error while rendering point clouds: '{e.Message}'");
+        }
     }
 
 
     public void TogglePointCloud()
     {
-        if (clouds == null || !name.Equals(currentPointCloudName))
+        currentPointCloudName = "editor";
+        if (!clouds.ContainsKey("editor"))
         {
-            clouds = new PointCloudCollection();
+            clouds.Add("editor", new PointCloudCollection());
             Matrix4x4 teaching_pose_inv = new Matrix4x4(
                 new Vector4(-0.2733338f, 0.9619197f, 0, 0.8491958f),
                 new Vector4(-0.01537001f, -0.004351974f, 0.9998727f, -0.3713996f),
                 new Vector4(0.9617969f, 0.2732987f, 0.01597387f, 0.3999121f),
                 new Vector4(0f, 0f, 0f, 1)).transpose.inverse;
 
-            Matrix4x4 pose = Matrix4x4.TRS(cube_play.transform.position,
-                                            cube_play.transform.rotation,
-                                            Vector3.one);
+            Matrix4x4 pose = Matrix4x4.identity;
 
             //cube_record.transform.position = teaching_pose_inv.MultiplyPoint(cube_record.transform.position);
 
@@ -98,7 +103,8 @@ public class PointCloudAnimation : MonoBehaviour
                 //axis_transform[0, 0] = axis_transform[1, 1] = 0;
                 //axis_transform[0, 1] = axis_transform[1, 0] = 1;
                 //clouds.LoadFromPLY("TestCloud", pose);
-                clouds.LoadFromPLY("TestCloud", pose);
+                clouds["editor"].LoadFromSinglePLY("Assets\\Resources\\PointClouds\\TestCloud\\merged.ply", pose);
+                //clouds.LoadFromPLY("a7b1433e-29d9-4b09-83c3-83af78d89b3a/AddPaper", pose);
                 //clouds.LoadFromPLY("TestCloud", Matrix4x4.identity);
                 //clouds.LoadFromPLY("TestCloud", axis_transform);
             } catch (Exception ex)
@@ -106,10 +112,11 @@ public class PointCloudAnimation : MonoBehaviour
                 dbg.Log($"Error while loading the point clouds: {ex.Message}");
                 return;
             }
-            dbg.Log($"Successfully loaded {clouds.Count} point clouds from 3d\\{name}*.ply");
+            dbg.Log($"Successfully loaded {clouds["editor"].Count} point clouds from 3d\\{name}*.ply");
         }
         playing = !playing;
-        pointCloudRendererGo.SetActive(playing);
+        //pointCloudRendererGo.SetActive(playing);
+        pointCloudRenderer.Render(new ArrayList(), new ArrayList());
     }
 
 
@@ -117,21 +124,29 @@ public class PointCloudAnimation : MonoBehaviour
     {
         // Load point cloud from memory if none is currently loaded
         // or we want to display another one
-        if (clouds == null || !name.Equals(currentPointCloudName))
+        if (!playing)
         {
-            clouds = new PointCloudCollection();
-            try
+            currentPointCloudName = name;
+            current_idx = 0;
+            if (!clouds.ContainsKey(currentPointCloudName))
             {
-                clouds.LoadFromPLY(name, objectPose);
-            } catch (Exception ex)
-            {
-                dbg.Log($"Error while loading the point clouds: {ex.Message}");
-                return;
+                clouds.Add(currentPointCloudName, new PointCloudCollection());
+                try
+                {
+                    Debug.Log($"Loading new tutorial {name}, currentPointCloudName = {currentPointCloudName}");
+                    clouds[currentPointCloudName].LoadFromSinglePLY(name + "\\merged.ply", objectPose);
+                }
+                catch (Exception ex)
+                {
+                    dbg.Log($"Error while loading the point clouds: {ex.Message}");
+                    return;
+                }
+                dbg.Log($"Successfully loaded {clouds.Count} point clouds from 3d\\{name}*.ply");
             }
-            dbg.Log($"Successfully loaded {clouds.Count} point clouds from 3d\\{name}*.ply");
         }
         playing = !playing;
-        pointCloudRendererGo.SetActive(playing);
+        //pointCloudRendererGo.SetActive(playing);
+        pointCloudRenderer.Render(new ArrayList(), new ArrayList());
     }
 
     public void RenderTexture(Texture2D texture)

@@ -36,7 +36,7 @@ public class TutorialListManager : MonoBehaviour
         StorageFolder o3d = KnownFolders.Objects3D;
         baseDir = o3d.Path + "\\";
 #else
-        baseDir = "Assets/Resources/PointClouds/"  ;
+        baseDir = "Assets/Resources/PointClouds/";
 #endif
     }
 
@@ -110,15 +110,6 @@ public class TutorialListManager : MonoBehaviour
 
     public void Show(string name)
     {
-        if (name.Equals("none"))
-        {
-            panel.SetActive(true);
-            title.text = "Paper refill";
-            description.text = "This sequence shows the process of addin papar to the printer.\n" +
-                "Be aware that the tutorial refills tray 2, other trays are refilled analogously.";
-            counter.text = "2 / 3";;
-            return;
-        }
         objectName = name;
         idx = 0;
         panel.SetActive(true);
@@ -138,7 +129,7 @@ public class TutorialListManager : MonoBehaviour
                 dbg.Log($"{directories[i]}\n");
             }
         }
-        catch(Exception e)
+        catch (Exception e)
         {
             dbg.Log($"Error: {e.Message}!\n");
         }
@@ -169,8 +160,7 @@ public class TutorialListManager : MonoBehaviour
     public void TogglePlaying()
     {
         dbg.Log("Starting playback");
-        //animationRenderer.TogglePointCloud($"{objectName}\\{directories[idx]}", objectPose);
-        animationRenderer.TogglePointCloud($"{objectName}\\{directories[idx]}", Matrix4x4.identity);
+        animationRenderer.TogglePointCloud($"{objectName}\\{directories[idx]}", objectPose);
     }
 
 }

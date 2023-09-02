@@ -6,6 +6,7 @@ using UnityEngine.Video;
 using System.Security.Cryptography;
 using System.Net.Http.Headers;
 using System.Configuration;
+using Tutorials;
 
 #if ENABLE_WINMD_SUPPORT
 using Windows.Storage;
@@ -72,16 +73,31 @@ public class PointCloudCollection : MonoBehaviour
         return this.Get(clouds.Count - 1);
     }
 
+    public void LoadFromSinglePLY(string filename, Matrix4x4  objectPose)
+    {
+        var start = DateTime.Now;
+
+        // Load all the point clouds belonging to the animation
+#if WINDOWS_UWP
+            StorageFolder o3d = KnownFolders.Objects3D;
+            filename = o3d.Path + "/" + filename;
+#endif
+        this.clouds = FileHandler.LoadPointCloudsFromPLY(filename, objectPose);
+
+        var end = DateTime.Now;
+        Debug.Log($"Loaded all clouds in {(end - start).TotalSeconds}");
+    }
+
     public bool LoadFromPLY(string directory, Matrix4x4 objectPose)
     {
+        var start = DateTime.Now;
         string[] filenames = null;
         try
         {
 #if WINDOWS_UWP
             StorageFolder o3d = KnownFolders.Objects3D;
             string dir = o3d.Path + "/" + directory;
-            filenames = Directory.GetFiles(dir, "*.ply");
-
+            filenames = Directory.GetFiles(dir, "*.ply", SearchOption.TopDirectoryOnly);
 #else
             filenames = Directory.GetFiles("Assets/Resources/PointClouds/" + directory, "*.ply");
 #endif
@@ -91,23 +107,29 @@ public class PointCloudCollection : MonoBehaviour
             Debug.LogException(e);
             return false;
         }
-
-        int n = Math.Min(filenames.Length, 3);
-        //int n = filenames.Length;
+        Debug.Log($"Took {(DateTime.Now - start).TotalSeconds}s to list files");
+        //int n = math.min(filenames.length, 3);
+        int n = filenames.Length;
         Debug.Log(string.Format("Loading {0} ply files", n));
 
         // Initialize enough space for all the point clouds
         this.clouds = new ArrayList(n);
 
+        // Return before reading from uninitialized memory
+        if (n == 0) return true;
+
         // Make sure we get the correct order
         Array.Sort(filenames);
 
         // Load all the point clouds belonging to the animation
+        string teachingPosePath = filenames[0].Substring(0, filenames[0].LastIndexOf('\\'));
+        Matrix4x4 teachingPoseInv = FileHandler.ReadMatrix(teachingPosePath + "/object_pose.txt").inverse;
         for (int i = 0; i < n; i++)
         {
-            this.clouds.Add(new PointCloud(filenames[i], objectPose));
+            this.clouds.Add(new PointCloud(filenames[i], objectPose, teachingPoseInv));
         }
-        Debug.Log("Loaded all files");
+        var end = DateTime.Now;
+        Debug.Log($"Loaded all files in {(end - start).TotalSeconds}");
 
         return true;
     }

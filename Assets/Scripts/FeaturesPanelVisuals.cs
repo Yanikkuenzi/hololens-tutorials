@@ -24,6 +24,7 @@ namespace Microsoft.MixedReality.Toolkit.UI
                 {
                     handProfile.EnableHandMeshVisualization = false;
                 }
+                Debug.Log($"In {name}");
             }
         }
     }
