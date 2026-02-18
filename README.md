@@ -11,6 +11,8 @@ users as 3D animations. To achieve our proposed method of capturing 3D tutorial 
 pose of the target object. We also employ segmentation-based methods to detect and remove irrelevant information, such as the background.
 This combination of techniques allows for more accurate and effective capture of 3D point clouds with the necessary spatial information.
 
+[Thesis](https://drive.proton.me/urls/QPR6XS5DVM#apR3uZMl6Pio)
+
 ### Demo
 In this sample tutorial, the user learns how to refill the paper tray of an office printer
 
